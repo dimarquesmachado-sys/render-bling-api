@@ -392,7 +392,13 @@ app.get('/celular', (req, res) => {
 
       <img id="imagem" />
     </div>
+<audio id="somOk">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+</audio>
 
+<audio id="somErro">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+</audio>
     <script>
       let idProduto = null;
 function toggleSenha() {
