@@ -379,6 +379,7 @@ app.get('/celular', (req, res) => {
 <button id="btnEntrar" onclick="login()">Entrar</button>
 
     <div id="sistema">
+    <button onclick="sair()" style="background:#eee; color:#000;">Sair</button>
      <input type="text" id="sku" placeholder="Bipar ou digitar SKU" onkeypress="if(event.key==='Enter'){buscar();}" autofocus />
       <button onclick="buscar()">Buscar</button>
 
@@ -403,14 +404,53 @@ app.get('/celular', (req, res) => {
 
    <script>
   let idProduto = null;
+const DURACAO_LOGIN_MS = 24 * 60 * 60 * 1000;
 
+function salvarSessao(usuario) {
+  localStorage.setItem('bling_login', JSON.stringify({
+    usuario,
+    expiraEm: Date.now() + DURACAO_LOGIN_MS
+  }));
+}
+
+function obterSessao() {
+  const bruto = localStorage.getItem('bling_login');
+  if (!bruto) return null;
+
+  try {
+    const sessao = JSON.parse(bruto);
+    if (!sessao.expiraEm || Date.now() > sessao.expiraEm) {
+      localStorage.removeItem('bling_login');
+      return null;
+    }
+    return sessao;
+  } catch {
+    localStorage.removeItem('bling_login');
+    return null;
+  }
+}
+
+function aplicarLoginNaTela(usuario) {
+  document.getElementById('sistema').style.display = 'block';
+  document.getElementById('tituloPagina').innerText = 'Sistema';
+  document.getElementById('usuario').style.display = 'none';
+  document.getElementById('senha').style.display = 'none';
+  document.getElementById('chkMostrarSenha').parentElement.style.display = 'none';
+  document.getElementById('btnEntrar').style.display = 'none';
+  document.getElementById('sku').focus();
+}
+
+function sair() {
+  localStorage.removeItem('bling_login');
+  location.reload();
+}
   function toggleSenha() {
     const campo = document.getElementById('senha');
     if (!campo) return;
     campo.type = campo.type === 'password' ? 'text' : 'password';
   }
 
-  function tocarSom(tipo) {
+ function tocarSom(tipo) {
   if (tipo === 'ok') {
     const som = document.getElementById('somOk');
     if (som) {
@@ -428,19 +468,19 @@ app.get('/celular', (req, res) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(220, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(140, ctx.currentTime + 0.18);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(260, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(120, ctx.currentTime + 0.35);
 
       gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.20);
+      gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.20);
+      osc.stop(ctx.currentTime + 0.38);
     } catch (e) {
       console.log('Erro ao tocar som de erro:', e);
     }
@@ -461,14 +501,9 @@ app.get('/celular', (req, res) => {
       const d = await r.json().catch(() => ({}));
 
       if (r.status === 200) {
-        document.getElementById('sistema').style.display = 'block';
-        document.getElementById('tituloPagina').innerText = 'GOOD x Localização Estoque';
-        document.getElementById('usuario').style.display = 'none';
-        document.getElementById('senha').style.display = 'none';
-        document.getElementById('chkMostrarSenha').parentElement.style.display = 'none';
-        document.getElementById('btnEntrar').style.display = 'none';
-        document.getElementById('sku').focus();
-      } else {
+  salvarSessao(usuario);
+  aplicarLoginNaTela(usuario);
+} else {
         tocarSom('erro');
         alert(d.mensagem || 'Login inválido');
       }
@@ -548,6 +583,10 @@ document.getElementById('imagem').style.display = 'none';
 
     document.getElementById('sku').focus();
   }
+  const sessaoExistente = obterSessao();
+if (sessaoExistente) {
+  aplicarLoginNaTela(sessaoExistente.usuario);
+}
 </script>
   </body>
   </html>
