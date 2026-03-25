@@ -221,9 +221,13 @@ app.get("/buscar", async (req, res) => {
     const produto = mapearProdutoParaPainel(produtoLista, produtoDetalhe);
 
     return res.json({
-      ok: true,
-      produto
-    });
+  ok: true,
+  produto,
+  debug: {
+    produtoLista,
+    produtoDetalhe
+  }
+});
 
   } catch (error) {
     console.error("Erro /buscar:", error);
