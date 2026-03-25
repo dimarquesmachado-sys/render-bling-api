@@ -407,6 +407,7 @@ app.get('/celular', (req, res) => {
 
    <script>
   let idProduto = null;
+let codigoProdutoAtual = null;
 const DURACAO_LOGIN_MS = 24 * 60 * 60 * 1000;
 
 function salvarSessao(usuario) {
@@ -550,11 +551,12 @@ function sair() {
   }
 
   idProduto = d.produto.id || null;
+  codigoProdutoAtual = d.produto.codigo || null;
   document.getElementById('novoLocal').focus();
 }
 
   async function salvar() {
-    const sku = document.getElementById('sku').value.trim();
+   const sku = codigoProdutoAtual || document.getElementById('sku').value.trim();
     const novoLocal = document.getElementById('novoLocal').value.trim();
 
     const r = await fetch('/salvar', {
@@ -590,9 +592,10 @@ function sair() {
     document.getElementById('local').innerText = '';
     document.getElementById('imagem').src = '';
 document.getElementById('imagem').style.display = 'none';
-    idProduto = null;
+idProduto = null;
+codigoProdutoAtual = null;
 
-    document.getElementById('sku').focus();
+document.getElementById('sku').focus();
   }
   const sessaoExistente = obterSessao();
 if (sessaoExistente) {
