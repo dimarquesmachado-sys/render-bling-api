@@ -5,6 +5,41 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+async function renovarAccessToken() {
+  const clientId = process.env.BLING_CLIENT_ID;
+  const clientSecret = process.env.BLING_CLIENT_SECRET;
+  const refreshToken = process.env.BLING_REFRESH_TOKEN;
+
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+  const body = new URLSearchParams();
+  body.append("grant_type", "refresh_token");
+  body.append("refresh_token", refreshToken);
+
+  const response = await fetch("https://www.bling.com.br/Api/v3/oauth/token", {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "1.0",
+      "enable-jwt": "1"
+    },
+    body: body.toString()
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.log("Erro ao renovar token:", data);
+    throw new Error("Erro ao renovar token");
+  }
+
+  console.log("NOVO ACCESS TOKEN:", data.access_token);
+  console.log("NOVO REFRESH TOKEN:", data.refresh_token);
+
+  return data;
+}
+
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY; // chave da sua extensão
 const BLING_ACCESS_TOKEN = process.env.BLING_ACCESS_TOKEN; // token do Bling
@@ -44,13 +79,34 @@ app.get("/buscar", async (req, res) => {
       });
     }
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${BLING_ACCESS_TOKEN}`,
-        Accept: "application/json"
-      }
-    });
+    let accessToken = process.env.BLING_ACCESS_TOKEN;
+
+let response = await fetch(url, {
+  method: "GET",
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json"
+  }
+});
+
+let data = await response.json();
+
+// Se token expirou, renova automaticamente
+if (!response.ok && data?.error?.type === "invalid_token") {
+  const novosTokens = await renovarAccessToken();
+
+  accessToken = novosTokens.access_token;
+
+  response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json"
+    }
+  });
+
+  data = await response.json();
+}
 
     const data = await response.json();
 
