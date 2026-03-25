@@ -452,6 +452,28 @@ app.get('/celular', (req, res) => {
     return;
   }
 
+  alert('Salvo com sucesso');
+
+  // LIMPAR TELA
+  document.getElementById('sku').value = '';
+  document.getElementById('novoLocal').value = '';
+  document.getElementById('nome').innerText = '';
+  document.getElementById('estoque').innerText = '';
+  document.getElementById('local').innerText = '';
+  document.getElementById('imagem').src = '';
+  idProduto = null;
+
+  // CURSOR VOLTA PRO SKU
+  document.getElementById('sku').focus();
+}
+
+  const d = await r.json();
+
+  if (!d.ok) {
+    alert(d.erro || 'Erro ao salvar');
+    return;
+  }
+
   document.getElementById('local').innerText = d.produto?.localizacao || novoLocal;
   alert('Salvo com sucesso');
 }
