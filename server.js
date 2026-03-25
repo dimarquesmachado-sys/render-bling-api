@@ -126,22 +126,49 @@ function sanitizeProdutoParaPut(produto, novaLocalizacao) {
 }
 
 function mapearProdutoParaPainel(produtoLista, produtoDetalhe) {
-  const p = produtoDetalhe || produtoLista || {};
+  const p = produtoDetalhe || {};
+  const l = produtoLista || {};
 
+  // -------------------------
+  // IMAGEM
+  // -------------------------
   let imagem = "";
+
   if (p.imagemURL) imagem = p.imagemURL;
+  else if (l.imagemURL) imagem = l.imagemURL;
   else if (Array.isArray(p.imagensExternas) && p.imagensExternas.length > 0) {
     imagem = p.imagensExternas[0]?.link || p.imagensExternas[0]?.url || "";
+  } else if (Array.isArray(l.imagensExternas) && l.imagensExternas.length > 0) {
+    imagem = l.imagensExternas[0]?.link || l.imagensExternas[0]?.url || "";
   } else if (Array.isArray(p.imagens) && p.imagens.length > 0) {
     imagem = p.imagens[0]?.link || p.imagens[0]?.url || "";
+  } else if (Array.isArray(l.imagens) && l.imagens.length > 0) {
+    imagem = l.imagens[0]?.link || l.imagens[0]?.url || "";
+  }
+
+  // -------------------------
+  // LOCALIZAÇÃO
+  // -------------------------
+  let localizacao = p.localizacao || l.localizacao || "";
+
+  // fallback para campo customizado "Endereço"
+  if (!localizacao && Array.isArray(p.camposCustomizados)) {
+    const campoEndereco = p.camposCustomizados.find(c =>
+      (c.item || "").toLowerCase().trim() === "endereço" ||
+      (c.item || "").toLowerCase().trim() === "endereco"
+    );
+
+    if (campoEndereco && campoEndereco.valor) {
+      localizacao = campoEndereco.valor;
+    }
   }
 
   return {
-    id: p.id || produtoLista?.id || null,
-    nome: p.nome || p.descricao || produtoLista?.nome || produtoLista?.descricao || "",
-    codigo: p.codigo || produtoLista?.codigo || "",
-    localizacao: p.localizacao || produtoLista?.localizacao || "",
-    estoque: p.estoque?.saldoVirtualTotal || produtoLista?.estoque?.saldoVirtualTotal || 0,
+    id: p.id || l.id || null,
+    nome: p.nome || p.descricao || l.nome || l.descricao || "",
+    codigo: p.codigo || l.codigo || "",
+    localizacao,
+    estoque: p.estoque?.saldoVirtualTotal || l.estoque?.saldoVirtualTotal || 0,
     imagem
   };
 }
