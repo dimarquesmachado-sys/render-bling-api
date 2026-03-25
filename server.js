@@ -129,9 +129,6 @@ function mapearProdutoParaPainel(produtoLista, produtoDetalhe) {
   const p = produtoDetalhe || {};
   const l = produtoLista || {};
 
-  // -------------------------
-  // IMAGEM
-  // -------------------------
   let imagem = "";
 
   if (p.imagemURL) imagem = p.imagemURL;
@@ -146,19 +143,15 @@ function mapearProdutoParaPainel(produtoLista, produtoDetalhe) {
     imagem = l.imagens[0]?.link || l.imagens[0]?.url || "";
   }
 
-  // -------------------------
-  // LOCALIZAÇÃO
-  // -------------------------
   let localizacao = p.localizacao || l.localizacao || "";
 
-  // fallback para campo customizado "Endereço"
   if (!localizacao && Array.isArray(p.camposCustomizados)) {
-    const campoEndereco = p.camposCustomizados.find(c =>
-      (c.item || "").toLowerCase().trim() === "endereço" ||
-      (c.item || "").toLowerCase().trim() === "endereco"
-    );
+    const campoEndereco = p.camposCustomizados.find(c => {
+      const nome = (c.item || "").toLowerCase().trim();
+      return nome === "endereço" || nome === "endereco";
+    });
 
-    if (campoEndereco && campoEndereco.valor) {
+    if (campoEndereco?.valor) {
       localizacao = campoEndereco.valor;
     }
   }
