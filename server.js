@@ -383,7 +383,7 @@ app.get('/celular', (req, res) => {
 
     <div id="sistema">
     
-     <input type="text" id="sku" placeholder="Bipar ou digitar SKU" onkeypress="if(event.key==='Enter'){buscar();}" autofocus />
+     <input type="text" id="sku" placeholder="Bipar EAN ou digitar SKU" onkeypress="if(event.key==='Enter'){buscar();}" autofocus />
       <button onclick="buscar()">Buscar</button>
 
       <div class="box">
