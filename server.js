@@ -365,8 +365,30 @@ app.get('/celular', (req, res) => {
       img { width: 100%; margin-top: 10px; }
       #sistema { display: none; }
     </style>
-  </head>
+  <style>
+#toast {
+  position: fixed;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 20px;
+  border-radius: 10px;
+  color: white;
+  font-size: 16px;
+  z-index: 9999;
+  display: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.toast-ok {
+  background: #2e7d32;
+}
+.toast-erro {
+  background: #c62828;
+}
+</style>
+</head>
   <body>
+  <div id="toast"></div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
   <h2 id="tituloPagina" style="margin:0;">Login</h2>
   <button id="btnSairTopo" onclick="sair()" style="display:none; width:auto; padding:8px 14px; margin-top:0; font-size:14px; background:#eee; color:#000; border:1px solid #ccc; border-radius:8px;">Sair</button>
@@ -407,6 +429,16 @@ app.get('/celular', (req, res) => {
 
    <script>
   let idProduto = null;
+  function mostrarToast(msg, tipo) {
+  const toast = document.getElementById('toast');
+  toast.innerText = msg;
+  toast.className = tipo === 'ok' ? 'toast-ok' : 'toast-erro';
+  toast.style.display = 'block';
+
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 2000);
+}
 let codigoProdutoAtual = null;
 const DURACAO_LOGIN_MS = 24 * 60 * 60 * 1000;
 
@@ -532,7 +564,7 @@ function sair() {
   if (!d.ok || !d.produto) {
     tocarSom('erro');
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    alert(d.erro || 'Produto não encontrado');
+    mostrarToast('Produto não encontrado', 'erro');
     return;
   }
 
@@ -584,7 +616,7 @@ function sair() {
       navigator.vibrate([80, 40, 80]);
     }
 
-    alert('Salvo com sucesso');
+    mostrarToast('Salvo com sucesso', 'ok');
 
     document.getElementById('sku').value = '';
     document.getElementById('novoLocal').value = '';
