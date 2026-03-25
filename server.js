@@ -2,8 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 
-const usuarios = JSON.parse(fs.readFileSync("./usuarios.json", "utf8"));
-
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -11,16 +9,108 @@ app.use(express.json({ limit: "2mb" }));
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
 
+let usuarios = [];
+try {
+  usuarios = JSON.parse(fs.readFileSync("./usuarios.json", "utf8"));
+} catch (e) {
+  console.error("Erro ao ler usuarios.json:", e.message);
+  usuarios = [];
+}
+
+// ================= HELPERS =================
+function normalize(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function onlyDigits(v) {
+  return String(v || "").replace(/\D/g, "");
+}
+
+function isExactCaseInsensitive(a, b) {
+  return normalize(a) === normalize(b);
+}
+
+function isExactDigits(a, b) {
+  const aa = onlyDigits(a);
+  const bb = onlyDigits(b);
+  return aa && bb && aa === bb;
+}
+
+function extractImage(produto) {
+  return (
+    produto?.imagemURL ||
+    produto?.imagemUrl ||
+    produto?.imagem ||
+    produto?.imagens?.[0]?.url ||
+    produto?.midia?.[0]?.url ||
+    ""
+  );
+}
+
+function extractLocalizacao(produto) {
+  return (
+    produto?.estoque?.localizacao ||
+    produto?.localizacao ||
+    produto?.depositos?.[0]?.localizacao ||
+    produto?.deposito?.localizacao ||
+    ""
+  );
+}
+
+function extractEstoque(produto) {
+  return (
+    produto?.estoque?.saldoVirtualTotal ??
+    produto?.estoque?.saldoVirtual ??
+    produto?.saldoVirtualTotal ??
+    produto?.saldoVirtual ??
+    0
+  );
+}
+
+function getPossiveisCodigosSku(obj) {
+  return [
+    obj?.codigo,
+    obj?.sku,
+    obj?.codigoProduto,
+    obj?.codigoPai
+  ].filter(Boolean);
+}
+
+function getPossiveisGtins(obj) {
+  return [
+    obj?.gtin,
+    obj?.ean,
+    obj?.codigoBarras,
+    obj?.gtinEan,
+    obj?.gtinTributario,
+    obj?.codigo_barras
+  ].filter(Boolean);
+}
+
 // ================= LOGIN =================
 app.post("/login", (req, res) => {
-  const { usuario, senha } = req.body;
+  try {
+    const { usuario, senha } = req.body || {};
 
-  const user = usuarios.find((u) => u.usuario === usuario && u.senha === senha);
+    const user = usuarios.find(
+      (u) => u.usuario === usuario && u.senha === senha
+    );
 
-  if (user) {
-    res.json({ sucesso: true, perfil: user.perfil, usuario: user.usuario });
-  } else {
-    res.status(401).json({ sucesso: false, mensagem: "Usuário ou senha inválidos" });
+    if (user) {
+      return res.json({
+        sucesso: true,
+        perfil: user.perfil,
+        usuario: user.usuario
+      });
+    }
+
+    return res
+      .status(401)
+      .json({ sucesso: false, mensagem: "Usuário ou senha inválidos" });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ sucesso: false, mensagem: error.message });
   }
 });
 
@@ -29,6 +119,10 @@ async function renovarAccessToken() {
   const clientId = process.env.BLING_CLIENT_ID;
   const clientSecret = process.env.BLING_CLIENT_SECRET;
   const refreshToken = process.env.BLING_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Variáveis do OAuth Bling ausentes");
+  }
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
@@ -47,62 +141,176 @@ async function renovarAccessToken() {
     body: body.toString()
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.description ||
+        data?.error?.type ||
+        "Falha ao renovar token do Bling"
+    );
+  }
+
   return data;
 }
 
 async function blingRequest(url, options = {}, accessToken = process.env.BLING_ACCESS_TOKEN) {
   let token = accessToken;
 
-  let response = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      ...(options.headers || {})
-    }
-  });
-
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
-  }
-
-  if (!response.ok && data?.error?.type === "invalid_token") {
-    const novosTokens = await renovarAccessToken();
-    token = novosTokens.access_token;
-
-    response = await fetch(url, {
+  async function doFetch(currentToken) {
+    const response = await fetch(url, {
       ...options,
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${currentToken}`,
         Accept: "application/json",
         ...(options.headers || {})
       }
     });
 
-    data = await response.json();
+    const data = await response.json().catch(() => ({}));
+    return { response, data };
+  }
+
+  let { response, data } = await doFetch(token);
+
+  const tokenInvalido =
+    response.status === 401 ||
+    data?.error?.type === "invalid_token" ||
+    /invalid_token/i.test(JSON.stringify(data || {}));
+
+  if (tokenInvalido) {
+    const novosTokens = await renovarAccessToken();
+    token = novosTokens.access_token;
+
+    const segunda = await doFetch(token);
+    response = segunda.response;
+    data = segunda.data;
   }
 
   return { response, data, accessToken: token };
 }
 
-// ================= HELPERS =================
-function normalize(v) {
-  return String(v || "").trim().toLowerCase();
+// ================= BLING HELPERS =================
+async function listarProdutosPorUrl(url, accessTokenAtual) {
+  const tentativa = await blingRequest(url, {}, accessTokenAtual);
+  return tentativa;
 }
 
-function getPossiveisGtins(obj) {
-  const campos = [
-    obj?.gtin,
-    obj?.ean,
-    obj?.codigoBarras,
-    obj?.gtinEan,
-    obj?.gtinTributario
-  ];
-  return campos.map(normalize).filter(Boolean);
+async function buscarDetalheProduto(id, accessTokenAtual) {
+  const detalhe = await blingRequest(
+    `https://api.bling.com.br/Api/v3/produtos/${id}`,
+    {},
+    accessTokenAtual
+  );
+
+  if (!detalhe.response.ok) return null;
+
+  return {
+    produto: detalhe.data?.data || null,
+    accessToken: detalhe.accessToken
+  };
+}
+
+function matchSkuExato(produto, valorDigitado) {
+  const candidatos = getPossiveisCodigosSku(produto);
+  return candidatos.some((c) => isExactCaseInsensitive(c, valorDigitado));
+}
+
+function matchEanExato(produto, valorDigitado) {
+  const candidatos = getPossiveisGtins(produto);
+  return candidatos.some((c) => isExactDigits(c, valorDigitado));
+}
+
+async function resolverProduto(tipo, valor) {
+  const tipoBusca = String(tipo || "").toUpperCase();
+  const valorOriginal = String(valor || "").trim();
+
+  let accessTokenAtual = process.env.BLING_ACCESS_TOKEN;
+
+  if (!valorOriginal) {
+    return { ok: false, erro: "Código não informado" };
+  }
+
+  const urlsBusca =
+    tipoBusca === "SKU"
+      ? [
+          `https://api.bling.com.br/Api/v3/produtos?codigo=${encodeURIComponent(valorOriginal)}`,
+          `https://api.bling.com.br/Api/v3/produtos?sku=${encodeURIComponent(valorOriginal)}`
+        ]
+      : [
+          `https://api.bling.com.br/Api/v3/produtos?gtin=${encodeURIComponent(valorOriginal)}`,
+          `https://api.bling.com.br/Api/v3/produtos?ean=${encodeURIComponent(valorOriginal)}`,
+          `https://api.bling.com.br/Api/v3/produtos?codigoBarras=${encodeURIComponent(valorOriginal)}`
+        ];
+
+  const idsTestados = new Set();
+
+  for (const url of urlsBusca) {
+    const tentativa = await listarProdutosPorUrl(url, accessTokenAtual);
+    accessTokenAtual = tentativa.accessToken;
+
+    if (!tentativa.response.ok) continue;
+
+    const lista = tentativa.data?.data || [];
+
+    for (const item of lista) {
+      if (!item?.id) continue;
+      if (idsTestados.has(item.id)) continue;
+      idsTestados.add(item.id);
+
+      let bateNaLista = false;
+
+      if (tipoBusca === "SKU") {
+        bateNaLista = matchSkuExato(item, valorOriginal);
+      } else {
+        bateNaLista = matchEanExato(item, valorOriginal);
+      }
+
+      if (!bateNaLista) {
+        const detalhe = await buscarDetalheProduto(item.id, accessTokenAtual);
+        if (!detalhe?.produto) continue;
+
+        accessTokenAtual = detalhe.accessToken;
+
+        const p = detalhe.produto;
+        const bateNoDetalhe =
+          tipoBusca === "SKU"
+            ? matchSkuExato(p, valorOriginal)
+            : matchEanExato(p, valorOriginal);
+
+        if (bateNoDetalhe) {
+          return {
+            ok: true,
+            produto: p,
+            accessToken: accessTokenAtual
+          };
+        }
+
+        continue;
+      }
+
+      const detalhe = await buscarDetalheProduto(item.id, accessTokenAtual);
+      if (!detalhe?.produto) continue;
+
+      accessTokenAtual = detalhe.accessToken;
+
+      const p = detalhe.produto;
+      const confirma =
+        tipoBusca === "SKU"
+          ? matchSkuExato(p, valorOriginal)
+          : matchEanExato(p, valorOriginal);
+
+      if (confirma) {
+        return {
+          ok: true,
+          produto: p,
+          accessToken: accessTokenAtual
+        };
+      }
+    }
+  }
+
+  return { ok: false, erro: "Produto não encontrado" };
 }
 
 // ================= BUSCAR =================
@@ -114,80 +322,30 @@ app.get("/buscar", async (req, res) => {
       return res.status(401).json({ ok: false, erro: "API key inválida" });
     }
 
-    const codigoNormalizado = normalize(codigo);
-    const tipoBusca = String(tipo).toUpperCase();
-
-    const urlsBusca =
-      tipoBusca === "SKU"
-        ? [
-            `https://api.bling.com.br/Api/v3/produtos?codigo=${codigo}`,
-            `https://api.bling.com.br/Api/v3/produtos?sku=${codigo}`
-          ]
-        : [
-            `https://api.bling.com.br/Api/v3/produtos?gtin=${codigo}`,
-            `https://api.bling.com.br/Api/v3/produtos?ean=${codigo}`,
-            `https://api.bling.com.br/Api/v3/produtos?codigoBarras=${codigo}`
-          ];
-
-    let produtoLista = null;
-    let accessTokenAtual = process.env.BLING_ACCESS_TOKEN;
-
-    for (const urlBusca of urlsBusca) {
-      const tentativa = await blingRequest(urlBusca, {}, accessTokenAtual);
-      accessTokenAtual = tentativa.accessToken;
-
-      if (!tentativa.response.ok) continue;
-
-      const lista = tentativa.data?.data || [];
-
-      const encontrado = lista.find((item) => {
-        if (tipoBusca === "SKU") {
-          return normalize(item.codigo || item.sku) === codigoNormalizado;
-        }
-
-        const gtins = getPossiveisGtins(item);
-        return gtins.includes(codigoNormalizado);
-      });
-
-      if (encontrado) {
-        produtoLista = encontrado;
-        break;
-      }
+    const tipoBusca = String(tipo || "").toUpperCase();
+    if (!["SKU", "EAN"].includes(tipoBusca)) {
+      return res.json({ ok: false, erro: "Tipo de busca inválido" });
     }
 
-    if (!produtoLista) {
-      return res.json({ ok: false, erro: "Produto não encontrado" });
+    const resultado = await resolverProduto(tipoBusca, codigo);
+
+    if (!resultado.ok || !resultado.produto) {
+      return res.json({ ok: false, erro: resultado.erro || "Produto não encontrado" });
     }
 
-    const id = produtoLista.id;
-
-    const detalhe = await blingRequest(
-      `https://api.bling.com.br/Api/v3/produtos/${id}`,
-      {},
-      accessTokenAtual
-    );
-
-    if (!detalhe.response.ok) {
-      return res.json({ ok: false, erro: "Erro ao buscar detalhe" });
-    }
-
-    const p = detalhe.data?.data || {};
-
-    let localizacao =
-      p?.estoque?.localizacao ||
-      p?.localizacao ||
-      p?.depositos?.[0]?.localizacao ||
-      "";
+    const p = resultado.produto;
 
     return res.json({
       ok: true,
       produto: {
         id: p.id,
-        nome: p.nome,
-        codigo: p.codigo,
-        estoque: p.estoque?.saldoVirtualTotal || 0,
-        localizacao: localizacao,
-        imagem: p.imagemURL || ""
+        nome: p.nome || "",
+        codigo: p.codigo || p.sku || "",
+        estoque: extractEstoque(p),
+        localizacao: extractLocalizacao(p),
+        imagem: extractImage(p),
+        ean:
+          getPossiveisGtins(p).find(Boolean) || ""
       }
     });
   } catch (error) {
@@ -198,21 +356,32 @@ app.get("/buscar", async (req, res) => {
 // ================= SALVAR =================
 app.post("/salvar", async (req, res) => {
   try {
-    const { key, codigo, novaLocalizacao } = req.body;
+    const { key, codigo, tipo, novaLocalizacao } = req.body || {};
 
     if (!key || key !== API_KEY) {
-      return res.status(401).json({ ok: false });
+      return res.status(401).json({ ok: false, erro: "API key inválida" });
     }
 
-    const busca = await blingRequest(
-      `https://api.bling.com.br/Api/v3/produtos?codigo=${codigo}`
-    );
-
-    if (!busca.data?.data?.length) {
-      return res.json({ ok: false, erro: "Produto não encontrado" });
+    if (!String(novaLocalizacao || "").trim()) {
+      return res.json({ ok: false, erro: "Nova localização não informada" });
     }
 
-    const id = busca.data.data[0].id;
+    let resultado = null;
+
+    if (tipo && String(tipo).toUpperCase() === "EAN") {
+      resultado = await resolverProduto("EAN", codigo);
+    } else {
+      resultado = await resolverProduto("SKU", codigo);
+      if (!resultado.ok) {
+        resultado = await resolverProduto("EAN", codigo);
+      }
+    }
+
+    if (!resultado.ok || !resultado.produto?.id) {
+      return res.json({ ok: false, erro: "Produto não encontrado para salvar" });
+    }
+
+    const id = resultado.produto.id;
 
     const patch = await blingRequest(
       `https://api.bling.com.br/Api/v3/produtos/${id}`,
@@ -220,23 +389,44 @@ app.post("/salvar", async (req, res) => {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          estoque: { localizacao: novaLocalizacao }
+          estoque: {
+            localizacao: String(novaLocalizacao).trim()
+          }
         })
       },
-      busca.accessToken
+      resultado.accessToken
     );
 
     if (!patch.response.ok) {
-      return res.json({ ok: false, erro: "Erro ao salvar" });
+      return res.json({
+        ok: false,
+        erro:
+          patch.data?.error?.description ||
+          patch.data?.error?.type ||
+          "Erro ao salvar"
+      });
     }
 
-    return res.json({ ok: true });
+    return res.json({
+      ok: true,
+      produto: {
+        id,
+        codigo: resultado.produto.codigo || "",
+        nome: resultado.produto.nome || "",
+        localizacao: String(novaLocalizacao).trim()
+      }
+    });
   } catch (error) {
     return res.json({ ok: false, erro: error.message });
   }
 });
 
+// ================= HEALTH =================
+app.get("/", (req, res) => {
+  res.send("Servidor rodando");
+});
+
 // ================= START =================
 app.listen(PORT, () => {
-  console.log("Servidor rodando");
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
