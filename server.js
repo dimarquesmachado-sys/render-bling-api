@@ -372,18 +372,36 @@ app.get("/buscar", async (req, res) => {
     const p = resultado.produto;
 
     return res.json({
-      ok: true,
-      produto: {
-        id: p.id,
-        nome: p.nome || "",
-        codigo: p.codigo || p.sku || "",
-        estoque: extractEstoque(p),
-        localizacao: extractLocalizacao(p),
-        imagem: extractImage(p),
-        ean:
-          getPossiveisGtins(p).find(Boolean) || ""
-      }
-    });
+  ok: true,
+  produto: {
+    id: p.id,
+    nome: p.nome || "",
+    codigo: p.codigo || p.sku || "",
+    estoque: extractEstoque(p),
+    localizacao: extractLocalizacao(p),
+    imagem: extractImage(p),
+    ean: getPossiveisGtins(p).find(Boolean) || ""
+  },
+  debug: {
+    id: p?.id || null,
+    codigo: p?.codigo || p?.sku || null,
+    gtin: p?.gtin || null,
+    ean: p?.ean || null,
+    codigoBarras: p?.codigoBarras || null,
+    gtinEan: p?.gtinEan || null,
+    gtinTributario: p?.gtinTributario || null,
+    codigo_barras: p?.codigo_barras || null,
+    imagemURL: p?.imagemURL || null,
+    imagemUrl: p?.imagemUrl || null,
+    imagem: p?.imagem || null,
+    linkImagem: p?.linkImagem || null,
+    urlImagem: p?.urlImagem || null,
+    imagensExternas: p?.imagensExternas || null,
+    imagens: p?.imagens || null,
+    midia: p?.midia || null,
+    anexos: p?.anexos || null
+  }
+});
   } catch (error) {
     return res.json({
   ok: false,
