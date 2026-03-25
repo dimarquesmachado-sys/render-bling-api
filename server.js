@@ -60,30 +60,51 @@ function isExactDigits(a, b) {
 }
 
 function extractImage(produto) {
-  const candidatos = [
-    produto?.imagemURL,
-    produto?.imagemUrl,
-    produto?.imagem,
-    produto?.linkImagem,
-    produto?.urlImagem,
+  const vistos = new Set();
 
-    produto?.imagensExternas?.externas?.[0]?.link,
-    produto?.imagensExternas?.externas?.[0]?.url,
+  function procurar(obj) {
+    if (!obj) return "";
 
-    produto?.imagensExternas?.[0]?.link,
-    produto?.imagensExternas?.[0]?.url,
+    if (typeof obj === "string") {
+      const valor = obj.trim();
 
-    produto?.imagens?.[0]?.link,
-    produto?.imagens?.[0]?.url,
+      if (!valor) return "";
 
-    produto?.midia?.[0]?.link,
-    produto?.midia?.[0]?.url,
+      const ehImagemDireta =
+        /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(valor);
 
-    produto?.anexos?.[0]?.link,
-    produto?.anexos?.[0]?.url
-  ].filter(Boolean);
+      const ehGoogleImage =
+        /^https?:\/\/lh3\.googleusercontent\.com\//i.test(valor);
 
-  return candidatos[0] || "";
+      if (ehImagemDireta || ehGoogleImage) {
+        return valor;
+      }
+
+      return "";
+    }
+
+    if (typeof obj !== "object") return "";
+
+    if (vistos.has(obj)) return "";
+    vistos.add(obj);
+
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const achou = procurar(item);
+        if (achou) return achou;
+      }
+      return "";
+    }
+
+    for (const chave of Object.keys(obj)) {
+      const achou = procurar(obj[chave]);
+      if (achou) return achou;
+    }
+
+    return "";
+  }
+
+  return procurar(produto) || "";
 }
 
 function extractLocalizacao(produto) {
