@@ -55,7 +55,7 @@ async function renovarAccessToken() {
 // CONSULTA BLING COM RETRY
 // =========================
 async function consultarBling(url, accessToken) {
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -63,16 +63,25 @@ async function consultarBling(url, accessToken) {
     }
   });
 
-  const data = await response.json();
-  return { response, data };
-}
+  let data = await response.json();
 
-// =========================
-// HOME
-// =========================
-app.get("/", (req, res) => {
-  res.send("API Bling rodando!");
-});
+  if (!response.ok && data?.error?.type === "invalid_token") {
+    const novosTokens = await renovarAccessToken();
+    accessToken = novosTokens.access_token;
+
+    response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json"
+      }
+    });
+
+    data = await response.json();
+  }
+
+  return { response, data, accessToken };
+}
 
 // =========================
 // BUSCAR PRODUTO
@@ -95,12 +104,12 @@ app.get("/buscar", async (req, res) => {
       });
     }
 
-    let url = "";
+    let urlBusca = "";
 
     if (tipo === "SKU") {
-      url = `https://api.bling.com.br/Api/v3/produtos?codigo=${encodeURIComponent(codigo)}`;
+      urlBusca = `https://api.bling.com.br/Api/v3/produtos?codigo=${encodeURIComponent(codigo)}`;
     } else if (tipo === "EAN") {
-      url = `https://api.bling.com.br/Api/v3/produtos?gtin=${encodeURIComponent(codigo)}`;
+      urlBusca = `https://api.bling.com.br/Api/v3/produtos?gtin=${encodeURIComponent(codigo)}`;
     } else {
       return res.status(400).json({
         ok: false,
@@ -108,42 +117,50 @@ app.get("/buscar", async (req, res) => {
       });
     }
 
-    let accessToken = BLING_ACCESS_TOKEN;
+    let accessToken = process.env.BLING_ACCESS_TOKEN;
 
-    let { response, data } = await consultarBling(url, accessToken);
+    const busca = await consultarBling(urlBusca, accessToken);
+    accessToken = busca.accessToken;
 
-    if (!response.ok && data?.error?.type === "invalid_token") {
-      const novosTokens = await renovarAccessToken();
-      accessToken = novosTokens.access_token;
-      ({ response, data } = await consultarBling(url, accessToken));
-    }
-
-    if (!response.ok) {
-      return res.status(response.status).json({
+    if (!busca.response.ok) {
+      return res.status(busca.response.status).json({
         ok: false,
-        erro: data?.error?.description || data?.message || "Erro ao consultar o Bling",
-        retornoBling: data
+        erro: busca.data?.error?.description || busca.data?.message || "Erro ao consultar o Bling",
+        retornoBling: busca.data
       });
     }
 
-    if (!data.data || data.data.length === 0) {
+    if (!busca.data?.data || busca.data.data.length === 0) {
       return res.json({
         ok: false,
         erro: "Produto não encontrado"
       });
     }
 
-    const produto = data.data[0];
+    const produtoLista = busca.data.data[0];
+    const id = produtoLista.id;
+
+    const detalhe = await consultarBling(`https://api.bling.com.br/Api/v3/produtos/${id}`, accessToken);
+
+    if (!detalhe.response.ok) {
+      return res.status(detalhe.response.status).json({
+        ok: false,
+        erro: detalhe.data?.error?.description || detalhe.data?.message || "Erro ao consultar detalhe do produto",
+        retornoBling: detalhe.data
+      });
+    }
+
+    const produto = detalhe.data?.data || produtoLista;
 
     return res.json({
       ok: true,
       produto: {
-        id: produto.id || null,
-        nome: produto.nome || produto.descricao || "",
-        codigo: produto.codigo || "",
-        localizacao: produto.localizacao || "",
-        estoque: produto.estoque?.saldoVirtualTotal || 0,
-        imagem: produto.imagemURL || ""
+        id: produto.id || produtoLista.id || null,
+        nome: produto.nome || produto.descricao || produtoLista.nome || produtoLista.descricao || "",
+        codigo: produto.codigo || produtoLista.codigo || "",
+        localizacao: produto.localizacao || produtoLista.localizacao || "",
+        estoque: produto.estoque?.saldoVirtualTotal || produtoLista.estoque?.saldoVirtualTotal || 0,
+        imagem: produto.imagemURL || produtoLista.imagemURL || ""
       }
     });
 
