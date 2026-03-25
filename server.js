@@ -64,8 +64,12 @@ function extractImage(produto) {
     produto?.imagemURL ||
     produto?.imagemUrl ||
     produto?.imagem ||
+    produto?.imagensExternas?.[0]?.link ||
+    produto?.imagensExternas?.[0]?.url ||
+    produto?.imagens?.[0]?.link ||
     produto?.imagens?.[0]?.url ||
     produto?.midia?.[0]?.url ||
+    produto?.midia?.[0]?.link ||
     ""
   );
 }
