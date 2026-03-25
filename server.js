@@ -1,16 +1,20 @@
 const express = require("express");
 const cors = require("cors");
 
+if (typeof fetch !== "function") {
+  throw new Error("Fetch não está disponível neste Node. Use Node 18+ no Render.");
+}
+
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
 const BLING_ACCESS_TOKEN = process.env.BLING_ACCESS_TOKEN;
 
 // =========================
-// RENOVAR ACCESS TOKEN
+// TOKEN
 // =========================
 async function renovarAccessToken() {
   const clientId = process.env.BLING_CLIENT_ID;
@@ -30,9 +34,9 @@ async function renovarAccessToken() {
   const response = await fetch("https://www.bling.com.br/Api/v3/oauth/token", {
     method: "POST",
     headers: {
-      "Authorization": `Basic ${basicAuth}`,
+      Authorization: `Basic ${basicAuth}`,
       "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "1.0",
+      Accept: "1.0",
       "enable-jwt": "1"
     },
     body: body.toString()
@@ -42,46 +46,112 @@ async function renovarAccessToken() {
 
   if (!response.ok) {
     console.log("Erro ao renovar token:", data);
-    throw new Error("Erro ao renovar token");
+    throw new Error(`Erro ao renovar token: ${JSON.stringify(data)}`);
   }
 
-  console.log("NOVO ACCESS TOKEN:", data.access_token);
-  console.log("NOVO REFRESH TOKEN:", data.refresh_token);
-
+  console.log("NOVO ACCESS TOKEN GERADO");
+  console.log("NOVO REFRESH TOKEN GERADO");
   return data;
 }
 
-// =========================
-// CONSULTA BLING COM RETRY
-// =========================
-async function consultarBling(url, accessToken) {
+async function blingRequest(url, options = {}, accessToken = process.env.BLING_ACCESS_TOKEN) {
+  let token = accessToken;
+
   let response = await fetch(url, {
-    method: "GET",
+    ...options,
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json"
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      ...(options.headers || {})
     }
   });
 
-  let data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    data = { raw: "Resposta não JSON do Bling" };
+  }
 
   if (!response.ok && data?.error?.type === "invalid_token") {
     const novosTokens = await renovarAccessToken();
-    accessToken = novosTokens.access_token;
+    token = novosTokens.access_token;
 
     response = await fetch(url, {
-      method: "GET",
+      ...options,
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json"
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        ...(options.headers || {})
       }
     });
 
-    data = await response.json();
+    try {
+      data = await response.json();
+    } catch {
+      data = { raw: "Resposta não JSON do Bling" };
+    }
   }
 
-  return { response, data, accessToken };
+  return { response, data, accessToken: token };
 }
+
+// =========================
+// HELPERS
+// =========================
+function sanitizeProdutoParaPut(produto, novaLocalizacao) {
+  // Copia tudo que veio do detalhe
+  const body = JSON.parse(JSON.stringify(produto || {}));
+
+  // Remove campos normalmente somente leitura / calculados
+  delete body.id;
+  delete body.estoque;
+  delete body.saldoEstoque;
+  delete body.dataCriacao;
+  delete body.dataAlteracao;
+  delete body.estrutura;
+  delete body.fornecedores;
+  delete body.depositos;
+  delete body.estoques;
+  delete body.saldoVirtualTotal;
+  delete body.saldoFisicoTotal;
+  delete body.imagemURL; // campo de leitura; imagens devem ir nas estruturas corretas do cadastro
+  delete body.variacoes;
+  delete body.multilojas;
+
+  // Atualiza só a localização
+  body.localizacao = novaLocalizacao;
+
+  return body;
+}
+
+function mapearProdutoParaPainel(produtoLista, produtoDetalhe) {
+  const p = produtoDetalhe || produtoLista || {};
+
+  let imagem = "";
+  if (p.imagemURL) imagem = p.imagemURL;
+  else if (Array.isArray(p.imagensExternas) && p.imagensExternas.length > 0) {
+    imagem = p.imagensExternas[0]?.link || p.imagensExternas[0]?.url || "";
+  } else if (Array.isArray(p.imagens) && p.imagens.length > 0) {
+    imagem = p.imagens[0]?.link || p.imagens[0]?.url || "";
+  }
+
+  return {
+    id: p.id || produtoLista?.id || null,
+    nome: p.nome || p.descricao || produtoLista?.nome || produtoLista?.descricao || "",
+    codigo: p.codigo || produtoLista?.codigo || "",
+    localizacao: p.localizacao || produtoLista?.localizacao || "",
+    estoque: p.estoque?.saldoVirtualTotal || produtoLista?.estoque?.saldoVirtualTotal || 0,
+    imagem
+  };
+}
+
+// =========================
+// HOME
+// =========================
+app.get("/", (req, res) => {
+  res.send("API Bling rodando!");
+});
 
 // =========================
 // BUSCAR PRODUTO
@@ -117,10 +187,7 @@ app.get("/buscar", async (req, res) => {
       });
     }
 
-    let accessToken = process.env.BLING_ACCESS_TOKEN;
-
-    const busca = await consultarBling(urlBusca, accessToken);
-    accessToken = busca.accessToken;
+    const busca = await blingRequest(urlBusca);
 
     if (!busca.response.ok) {
       return res.status(busca.response.status).json({
@@ -140,7 +207,7 @@ app.get("/buscar", async (req, res) => {
     const produtoLista = busca.data.data[0];
     const id = produtoLista.id;
 
-    const detalhe = await consultarBling(`https://api.bling.com.br/Api/v3/produtos/${id}`, accessToken);
+    const detalhe = await blingRequest(`https://api.bling.com.br/Api/v3/produtos/${id}`, {}, busca.accessToken);
 
     if (!detalhe.response.ok) {
       return res.status(detalhe.response.status).json({
@@ -150,21 +217,16 @@ app.get("/buscar", async (req, res) => {
       });
     }
 
-    const produto = detalhe.data?.data || produtoLista;
+    const produtoDetalhe = detalhe.data?.data || {};
+    const produto = mapearProdutoParaPainel(produtoLista, produtoDetalhe);
 
     return res.json({
       ok: true,
-      produto: {
-        id: produto.id || produtoLista.id || null,
-        nome: produto.nome || produto.descricao || produtoLista.nome || produtoLista.descricao || "",
-        codigo: produto.codigo || produtoLista.codigo || "",
-        localizacao: produto.localizacao || produtoLista.localizacao || "",
-        estoque: produto.estoque?.saldoVirtualTotal || produtoLista.estoque?.saldoVirtualTotal || 0,
-        imagem: produto.imagemURL || produtoLista.imagemURL || ""
-      }
+      produto
     });
 
   } catch (error) {
+    console.error("Erro /buscar:", error);
     return res.status(500).json({
       ok: false,
       erro: error.message
@@ -177,7 +239,7 @@ app.get("/buscar", async (req, res) => {
 // =========================
 app.post("/salvar", async (req, res) => {
   try {
-    const { key, codigo, novaLocalizacao } = req.body;
+    const { key, codigo, novaLocalizacao } = req.body || {};
 
     if (!key || key !== API_KEY) {
       return res.status(401).json({
@@ -193,71 +255,87 @@ app.post("/salvar", async (req, res) => {
       });
     }
 
-    let accessToken = BLING_ACCESS_TOKEN;
-
-    // 1. Buscar produto pelo código
-    let busca = await consultarBling(
-      `https://api.bling.com.br/Api/v3/produtos?codigo=${encodeURIComponent(codigo)}`,
-      accessToken
+    // 1) Busca produto por código
+    const busca = await blingRequest(
+      `https://api.bling.com.br/Api/v3/produtos?codigo=${encodeURIComponent(codigo)}`
     );
 
-    if (!busca.data?.data?.length) {
+    if (!busca.response.ok || !busca.data?.data?.length) {
       return res.status(404).json({
         ok: false,
-        erro: "Produto não encontrado."
+        erro: "Produto não encontrado.",
+        retornoBling: busca.data
       });
     }
 
     const id = busca.data.data[0].id;
 
-    // 2. Buscar detalhe completo do produto
-    let detalhe = await consultarBling(
+    // 2) Busca detalhe completo
+    const detalhe = await blingRequest(
       `https://api.bling.com.br/Api/v3/produtos/${id}`,
-      accessToken
+      {},
+      busca.accessToken
     );
 
-    if (!detalhe.data?.data) {
+    if (!detalhe.response.ok || !detalhe.data?.data) {
       return res.status(404).json({
         ok: false,
-        erro: "Erro ao buscar detalhe do produto."
+        erro: "Erro ao buscar detalhe completo do produto.",
+        retornoBling: detalhe.data
       });
     }
 
-    let produtoCompleto = detalhe.data.data;
+    const produtoCompleto = detalhe.data.data;
 
-    // 3. Alterar apenas a localização
-    produtoCompleto.localizacao = novaLocalizacao;
+    // 3) Preserva o máximo possível e altera só localizacao
+    const body = sanitizeProdutoParaPut(produtoCompleto, novaLocalizacao);
 
-    // 4. Enviar PUT com o objeto completo
-    let putResp = await fetch(`https://api.bling.com.br/Api/v3/produtos/${id}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-        "Content-Type": "application/json"
+    // 4) PUT
+    const putResp = await blingRequest(
+      `https://api.bling.com.br/Api/v3/produtos/${id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
       },
-      body: JSON.stringify(produtoCompleto)
-    });
+      detalhe.accessToken
+    );
 
-    let putData = await putResp.json();
-
-    if (!putResp.ok) {
-      return res.status(putResp.status).json({
+    if (!putResp.response.ok) {
+      return res.status(putResp.response.status).json({
         ok: false,
-        erro: "Erro ao salvar localização",
-        retornoBling: putData
+        erro: "Erro ao salvar localização no Bling.",
+        retornoBling: putResp.data,
+        bodyEnviado: body
       });
     }
+
+    // 5) Lê de novo para confirmar
+    const confirmacao = await blingRequest(
+      `https://api.bling.com.br/Api/v3/produtos/${id}`,
+      {},
+      putResp.accessToken
+    );
+
+    const produtoFinal = mapearProdutoParaPainel(busca.data.data[0], confirmacao.data?.data || produtoCompleto);
 
     return res.json({
       ok: true,
-      mensagem: "Localização salva com sucesso."
+      mensagem: "Localização salva com sucesso.",
+      produto: produtoFinal
     });
 
   } catch (error) {
+    console.error("Erro /salvar:", error);
     return res.status(500).json({
       ok: false,
       erro: error.message
     });
   }
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
