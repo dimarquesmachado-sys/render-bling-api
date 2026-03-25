@@ -416,7 +416,7 @@ app.get('/celular', (req, res) => {
       async function buscar() {
   const sku = document.getElementById('sku').value.trim();
 
-  const r = await fetch('/buscar?key=SUA_API_KEY_AQUI&tipo=SKU&codigo=' + encodeURIComponent(sku));
+  const r = await fetch('/buscar?key=GIRASSOL_ESTOQUE_2026&tipo=SKU&codigo=' + encodeURIComponent(sku));
   const d = await r.json();
 
   if (!d.ok || !d.produto) {
@@ -439,7 +439,7 @@ app.get('/celular', (req, res) => {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      key: 'SUA_API_KEY_AQUI',
+      key: 'GIRASSOL_ESTOQUE_2026',
       codigo: sku,
       novaLocalizacao: novoLocal
     })
