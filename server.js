@@ -143,7 +143,18 @@ function getPossiveisGtins(obj) {
     obj?.codigoBarras,
     obj?.gtinEan,
     obj?.gtinTributario,
-    obj?.codigo_barras
+    obj?.codigo_barras,
+    obj?.codigoDeBarras,
+    obj?.codigo_barra,
+    obj?.codBarras,
+    obj?.codigobarras,
+    obj?.codigoBarrasTributario,
+    obj?.gtin_embalagem,
+    obj?.gtinEmbalagem,
+    obj?.tributavel?.gtin,
+    obj?.tributavel?.ean,
+    obj?.tributacao?.gtin,
+    obj?.tributacao?.ean
   ].filter(Boolean);
 }
 
@@ -349,10 +360,10 @@ async function resolverProduto(tipo, valor) {
           };
         }
       }
-    } else {
+        } else {
       const candidatos = lista
         .filter((item) => item?.id && !idsJaTentados.has(item.id))
-        .slice(0, 5);
+        .slice(0, 15);
 
       for (const item of candidatos) {
         idsJaTentados.add(item.id);
@@ -372,7 +383,6 @@ async function resolverProduto(tipo, valor) {
         }
       }
     }
-  }
 
   return { ok: false, erro: "Produto não encontrado" };
 }
