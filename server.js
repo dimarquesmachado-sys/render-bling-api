@@ -1,20 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 
-if (typeof fetch !== "function") {
-  throw new Error("Fetch não está disponível neste Node. Use Node 18+ no Render.");
-}
-
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
-const BLING_ACCESS_TOKEN = process.env.BLING_ACCESS_TOKEN;
 
 // =========================
-// TOKEN
+// RENOVAR ACCESS TOKEN
 // =========================
 async function renovarAccessToken() {
   const clientId = process.env.BLING_CLIENT_ID;
@@ -22,7 +17,9 @@ async function renovarAccessToken() {
   const refreshToken = process.env.BLING_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Faltam BLING_CLIENT_ID, BLING_CLIENT_SECRET ou BLING_REFRESH_TOKEN no Render.");
+    throw new Error(
+      "Faltam BLING_CLIENT_ID, BLING_CLIENT_SECRET ou BLING_REFRESH_TOKEN no ambiente."
+    );
   }
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -45,15 +42,23 @@ async function renovarAccessToken() {
   const data = await response.json();
 
   if (!response.ok) {
-    console.log("Erro ao renovar token:", data);
+    console.error("Erro ao renovar token:", JSON.stringify(data));
     throw new Error(`Erro ao renovar token: ${JSON.stringify(data)}`);
   }
 
-  console.log("NOVO ACCESS TOKEN GERADO");
-  console.log("NOVO REFRESH TOKEN GERADO");
+  console.log("==========================================");
+  console.log("NOVOS TOKENS GERADOS PELO BLING");
+  console.log("ATUALIZE NO RENDER SE QUISER PERSISTIR:");
+  console.log("BLING_ACCESS_TOKEN=", data.access_token);
+  console.log("BLING_REFRESH_TOKEN=", data.refresh_token);
+  console.log("==========================================");
+
   return data;
 }
 
+// =========================
+// REQUEST AO BLING COM RETRY
+// =========================
 async function blingRequest(url, options = {}, accessToken = process.env.BLING_ACCESS_TOKEN) {
   let token = accessToken;
 
@@ -97,34 +102,8 @@ async function blingRequest(url, options = {}, accessToken = process.env.BLING_A
 }
 
 // =========================
-// HELPERS
+// MAPEAR PRODUTO PARA O PAINEL
 // =========================
-function sanitizeProdutoParaPut(produto, novaLocalizacao) {
-  // Copia tudo que veio do detalhe
-  const body = JSON.parse(JSON.stringify(produto || {}));
-
-  // Remove campos normalmente somente leitura / calculados
-  delete body.id;
-  delete body.estoque;
-  delete body.saldoEstoque;
-  delete body.dataCriacao;
-  delete body.dataAlteracao;
-  delete body.estrutura;
-  delete body.fornecedores;
-  delete body.depositos;
-  delete body.estoques;
-  delete body.saldoVirtualTotal;
-  delete body.saldoFisicoTotal;
-  delete body.imagemURL; // campo de leitura; imagens devem ir nas estruturas corretas do cadastro
-  delete body.variacoes;
-  delete body.multilojas;
-
-  // Atualiza só a localização
-  body.localizacao = novaLocalizacao;
-
-  return body;
-}
-
 function mapearProdutoParaPainel(produtoLista, produtoDetalhe) {
   const p = produtoDetalhe || {};
   const l = produtoLista || {};
@@ -143,11 +122,22 @@ function mapearProdutoParaPainel(produtoLista, produtoDetalhe) {
     imagem = l.imagens[0]?.link || l.imagens[0]?.url || "";
   }
 
-  let localizacao = p.localizacao || l.localizacao || "";
+  let localizacao =
+    p?.estoque?.localizacao ||
+    p?.localizacao ||
+    p?.deposito?.localizacao ||
+    p?.depositos?.[0]?.localizacao ||
+    p?.estoques?.[0]?.localizacao ||
+    l?.estoque?.localizacao ||
+    l?.localizacao ||
+    l?.deposito?.localizacao ||
+    l?.depositos?.[0]?.localizacao ||
+    l?.estoques?.[0]?.localizacao ||
+    "";
 
   if (!localizacao && Array.isArray(p.camposCustomizados)) {
-    const campoEndereco = p.camposCustomizados.find(c => {
-      const nome = (c.item || "").toLowerCase().trim();
+    const campoEndereco = p.camposCustomizados.find((c) => {
+      const nome = String(c.item || "").toLowerCase().trim();
       return nome === "endereço" || nome === "endereco";
     });
 
@@ -227,12 +217,19 @@ app.get("/buscar", async (req, res) => {
     const produtoLista = busca.data.data[0];
     const id = produtoLista.id;
 
-    const detalhe = await blingRequest(`https://api.bling.com.br/Api/v3/produtos/${id}`, {}, busca.accessToken);
+    const detalhe = await blingRequest(
+      `https://api.bling.com.br/Api/v3/produtos/${id}`,
+      {},
+      busca.accessToken
+    );
 
     if (!detalhe.response.ok) {
       return res.status(detalhe.response.status).json({
         ok: false,
-        erro: detalhe.data?.error?.description || detalhe.data?.message || "Erro ao consultar detalhe do produto",
+        erro:
+          detalhe.data?.error?.description ||
+          detalhe.data?.message ||
+          "Erro ao consultar detalhe do produto",
         retornoBling: detalhe.data
       });
     }
@@ -241,14 +238,9 @@ app.get("/buscar", async (req, res) => {
     const produto = mapearProdutoParaPainel(produtoLista, produtoDetalhe);
 
     return res.json({
-  ok: true,
-  produto,
-  debug: {
-    produtoLista,
-    produtoDetalhe
-  }
-});
-
+      ok: true,
+      produto
+    });
   } catch (error) {
     console.error("Erro /buscar:", error);
     return res.status(500).json({
@@ -272,14 +264,13 @@ app.post("/salvar", async (req, res) => {
       });
     }
 
-    if (!codigo || !novaLocalizacao) {
+    if (!codigo || novaLocalizacao === undefined || novaLocalizacao === null) {
       return res.status(400).json({
         ok: false,
         erro: "Código e nova localização são obrigatórios."
       });
     }
 
-    // 1) Busca produto por código
     const busca = await blingRequest(
       `https://api.bling.com.br/Api/v3/produtos?codigo=${encodeURIComponent(codigo)}`
     );
@@ -294,63 +285,53 @@ app.post("/salvar", async (req, res) => {
 
     const id = busca.data.data[0].id;
 
-    // 2) Busca detalhe completo
-    const detalhe = await blingRequest(
-      `https://api.bling.com.br/Api/v3/produtos/${id}`,
-      {},
-      busca.accessToken
-    );
+    const tentativasBody = [
+      { estoque: { localizacao: novaLocalizacao } },
+      { localizacao: novaLocalizacao }
+    ];
 
-    if (!detalhe.response.ok || !detalhe.data?.data) {
-      return res.status(404).json({
-        ok: false,
-        erro: "Erro ao buscar detalhe completo do produto.",
-        retornoBling: detalhe.data
-      });
-    }
+    let ultimaResposta = null;
 
-    const produtoCompleto = detalhe.data.data;
-
-    // 3) Preserva o máximo possível e altera só localizacao
-    const body = sanitizeProdutoParaPut(produtoCompleto, novaLocalizacao);
-
-    // 4) PUT
-    const putResp = await blingRequest(
-      `https://api.bling.com.br/Api/v3/produtos/${id}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
+    for (const body of tentativasBody) {
+      const patch = await blingRequest(
+        `https://api.bling.com.br/Api/v3/produtos/${id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
         },
-        body: JSON.stringify(body)
-      },
-      detalhe.accessToken
-    );
+        busca.accessToken
+      );
 
-    if (!putResp.response.ok) {
-      return res.status(putResp.response.status).json({
-        ok: false,
-        erro: "Erro ao salvar localização no Bling.",
-        retornoBling: putResp.data,
-        bodyEnviado: body
-      });
+      ultimaResposta = patch;
+
+      if (patch.response.ok) {
+        const confirmacao = await blingRequest(
+          `https://api.bling.com.br/Api/v3/produtos/${id}`,
+          {},
+          patch.accessToken
+        );
+
+        const produtoFinal = mapearProdutoParaPainel(
+          busca.data.data[0],
+          confirmacao.data?.data || {}
+        );
+
+        return res.json({
+          ok: true,
+          mensagem: "Localização atualizada com sucesso.",
+          produto: produtoFinal
+        });
+      }
     }
 
-    // 5) Lê de novo para confirmar
-    const confirmacao = await blingRequest(
-      `https://api.bling.com.br/Api/v3/produtos/${id}`,
-      {},
-      putResp.accessToken
-    );
-
-    const produtoFinal = mapearProdutoParaPainel(busca.data.data[0], confirmacao.data?.data || produtoCompleto);
-
-    return res.json({
-      ok: true,
-      mensagem: "Localização salva com sucesso.",
-      produto: produtoFinal
+    return res.status(ultimaResposta?.response?.status || 400).json({
+      ok: false,
+      erro: "Não foi possível atualizar a localização.",
+      retornoBling: ultimaResposta?.data || null
     });
-
   } catch (error) {
     console.error("Erro /salvar:", error);
     return res.status(500).json({
