@@ -10,6 +10,27 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
+function traduzirErroBling(msg) {
+  const texto = String(msg || "").toLowerCase().trim();
+
+  if (texto.includes("invalid refresh token")) {
+    return "Token de atualização do Bling inválido. Verifique BLING_REFRESH_TOKEN, BLING_CLIENT_ID e BLING_CLIENT_SECRET no Render.";
+  }
+
+  if (texto.includes("invalid_token")) {
+    return "Token de acesso do Bling inválido ou expirado.";
+  }
+
+  if (texto.includes("unauthorized")) {
+    return "Não autorizado no Bling.";
+  }
+
+  if (texto.includes("forbidden")) {
+    return "Acesso negado no Bling.";
+  }
+
+  return "Erro de comunicação com o Bling.";
+}
 
 let usuarios = [];
 try {
@@ -117,20 +138,21 @@ app.post("/login", (req, res) => {
 });
 
 // ================= TOKEN BLING =================
+// ================= TOKEN BLING =================
 async function renovarAccessToken() {
   const clientId = process.env.BLING_CLIENT_ID;
   const clientSecret = process.env.BLING_CLIENT_SECRET;
   const refreshToken = process.env.BLING_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Variáveis do OAuth Bling ausentes");
+    throw new Error("Credenciais OAuth do Bling ausentes no Render.");
   }
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
   const body = new URLSearchParams();
   body.append("grant_type", "refresh_token");
-  body.append("refresh_token", refreshToken);
+  body.append("refresh_token", String(refreshToken).trim());
 
   const response = await fetch("https://www.bling.com.br/Api/v3/oauth/token", {
     method: "POST",
@@ -143,14 +165,20 @@ async function renovarAccessToken() {
     body: body.toString()
   });
 
-  const data = await response.json().catch(() => ({}));
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
 
-  if (!response.ok) {
-    throw new Error(
+  if (!response.ok || !data?.access_token) {
+    const msg =
       data?.error?.description ||
-        data?.error?.type ||
-        "Falha ao renovar token do Bling"
-    );
+      data?.error?.type ||
+      data?.message ||
+      "Falha ao renovar token";
+    throw new Error(traduzirErroBling(msg));
   }
 
   return data;
@@ -169,7 +197,13 @@ async function blingRequest(url, options = {}, accessToken = process.env.BLING_A
       }
     });
 
-    const data = await response.json().catch(() => ({}));
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
     return { response, data };
   }
 
@@ -351,7 +385,10 @@ app.get("/buscar", async (req, res) => {
       }
     });
   } catch (error) {
-    return res.json({ ok: false, erro: error.message });
+    return res.json({
+  ok: false,
+  erro: traduzirErroBling(error.message)
+});
   }
 });
 
@@ -419,7 +456,10 @@ app.post("/salvar", async (req, res) => {
       }
     });
   } catch (error) {
-    return res.json({ ok: false, erro: error.message });
+    return res.json({
+  ok: false,
+  erro: traduzirErroBling(error.message)
+});
   }
 });
 
@@ -427,13 +467,11 @@ app.post("/salvar", async (req, res) => {
 app.get("/", (req, res) => {
   res.send("Servidor rodando");
 });
-app.get("/celular", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "celular.html"));
-});
 
 app.get("/celular", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "celular.html"));
 });
+
 // ================= START =================
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
