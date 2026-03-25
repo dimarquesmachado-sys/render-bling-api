@@ -1,12 +1,12 @@
 [
   {
-    "usuario": "diego",
-    "senha": "123456",
+    "usuario": "Diego",
+    "senha": "senha@X1",
     "perfil": "admin"
   },
   {
-    "usuario": "funcionario1",
-    "senha": "123456",
+    "usuario": "Lucas",
+    "senha": "good1",
     "perfil": "funcionario"
   }
 ]
