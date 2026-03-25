@@ -8,7 +8,18 @@ app.use(express.json({ limit: "2mb" }));
 
 const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
+// ================= LOGIN =================
+app.post('/login', (req, res) => {
+  const { usuario, senha } = req.body;
 
+  const user = usuarios.find(u => u.usuario === usuario && u.senha === senha);
+
+  if (user) {
+    res.json({ sucesso: true, perfil: user.perfil, usuario: user.usuario });
+  } else {
+    res.status(401).json({ sucesso: false, mensagem: 'Usuário ou senha inválidos' });
+  }
+});
 // =========================
 // RENOVAR ACCESS TOKEN
 // =========================
