@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-
+const fs = require('fs');
+const usuarios = JSON.parse(fs.readFileSync('./usuarios.json', 'utf8'));
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
