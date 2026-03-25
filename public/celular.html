@@ -29,8 +29,7 @@
       font-weight: 700;
     }
     .btn-sair,
-    .btn,
-    .btn-sec {
+    .btn {
       width: 100%;
       border: 1px solid #bdbdbd;
       background: #fff;
@@ -44,8 +43,7 @@
       padding: 14px 18px;
       font-size: 16px;
     }
-    .campo,
-    select {
+    .campo {
       width: 100%;
       border: 1px solid #bdbdbd;
       border-radius: 8px;
@@ -53,6 +51,7 @@
       font-size: 18px;
       background: #fff;
       margin-bottom: 14px;
+      transition: 0.15s;
     }
     .card {
       background: #fff;
@@ -101,21 +100,35 @@
   <div class="wrap">
     <div id="telaLogin" class="login-box">
       <h1 style="font-size: 26px; margin-bottom: 18px;">Entrar</h1>
+
       <input id="usuario" class="campo" type="text" placeholder="Usuário" />
+
       <div style="position: relative;">
-  <input id="senha" class="campo" type="password" placeholder="Senha" style="padding-right: 60px;" />
-  <button type="button" id="toggleSenha" style="
-    position: absolute;
-    right: 8px;
-    top: 8px;
-    bottom: 8px;
-    width: 44px;
-    border: 1px solid #bdbdbd;
-    background: #fff;
-    border-radius: 6px;
-    font-size: 16px;
-  ">👁</button>
-</div>
+        <input
+          id="senha"
+          class="campo"
+          type="password"
+          placeholder="Senha"
+          style="padding-right: 60px; margin-bottom: 14px;"
+        />
+        <button
+          type="button"
+          id="toggleSenha"
+          style="
+            position:absolute;
+            right:8px;
+            top:8px;
+            width:44px;
+            height:44px;
+            border:1px solid #bdbdbd;
+            background:#fff;
+            border-radius:6px;
+            font-size:16px;
+            cursor:pointer;
+          "
+        >👁</button>
+      </div>
+
       <button id="btnLogin" class="btn">Entrar</button>
       <div id="statusLogin" class="status"></div>
     </div>
@@ -126,10 +139,9 @@
         <button id="btnSair" class="btn-sair">Sair</button>
       </div>
 
-   
-
-      <input id="codigoBusca" class="campo" type="text" placeholder="Digitar SKU ou Bipar EAN" />
+      <input id="codigoBusca" class="campo" type="text" placeholder="Digite SKU ou EAN" />
       <button id="btnBuscar" class="btn">Buscar</button>
+      <div id="statusApp" class="status"></div>
 
       <div id="cardProduto" class="card hidden">
         <div class="linha"><strong>Produto:</strong> <span id="nomeProduto"></span></div>
@@ -145,14 +157,12 @@
       <div class="imagem-box">
         <img id="imagemProduto" class="imagem-produto" alt="Produto" />
       </div>
-
-      <div id="statusApp" class="status"></div>
     </div>
   </div>
 
   <script>
     const API_BASE = window.location.origin;
-    const API_KEY = "GIRASSOL_ESTOQUE_2026";
+    const API_KEY = "COLE_AQUI_SUA_API_KEY_EXATA";
 
     let produtoAtual = null;
 
@@ -163,8 +173,8 @@
     const senha = document.getElementById("senha");
     const btnLogin = document.getElementById("btnLogin");
     const statusLogin = document.getElementById("statusLogin");
+    const toggleSenha = document.getElementById("toggleSenha");
 
-    
     const codigoBusca = document.getElementById("codigoBusca");
     const btnBuscar = document.getElementById("btnBuscar");
     const btnSalvar = document.getElementById("btnSalvar");
@@ -181,55 +191,56 @@
     const imagemProduto = document.getElementById("imagemProduto");
 
     function setStatus(el, msg, tipo = "") {
-      function tocarBeep(tipo = "ok") {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.type = "sine";
-    osc.frequency.value = tipo === "ok" ? 880 : 220;
-    gain.gain.value = 0.08;
-
-    osc.start();
-
-    setTimeout(() => {
-      osc.stop();
-      ctx.close();
-    }, tipo === "ok" ? 120 : 220);
-  } catch (e) {}
-}
-
-function vibrar(tipo = "ok") {
-  if (!navigator.vibrate) return;
-  if (tipo === "ok") {
-    navigator.vibrate(120);
-  } else {
-    navigator.vibrate([120, 80, 120]);
-  }
-}
-
-function feedbackBusca(tipo) {
-  if (tipo === "ok") {
-    codigoBusca.style.border = "2px solid #118a39";
-    codigoBusca.style.background = "#eefbf1";
-    tocarBeep("ok");
-    vibrar("ok");
-  } else if (tipo === "erro") {
-    codigoBusca.style.border = "2px solid #c62828";
-    codigoBusca.style.background = "#fff1f1";
-    tocarBeep("erro");
-    vibrar("erro");
-  } else {
-    codigoBusca.style.border = "1px solid #bdbdbd";
-    codigoBusca.style.background = "#fff";
-  }
-}
       el.textContent = msg || "";
       el.className = "status" + (tipo ? " " + tipo : "");
+    }
+
+    function tocarBeep(tipo = "ok") {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = "sine";
+        osc.frequency.value = tipo === "ok" ? 880 : 220;
+        gain.gain.value = 0.08;
+
+        osc.start();
+
+        setTimeout(() => {
+          osc.stop();
+          ctx.close();
+        }, tipo === "ok" ? 120 : 220);
+      } catch (e) {}
+    }
+
+    function vibrar(tipo = "ok") {
+      if (!navigator.vibrate) return;
+      if (tipo === "ok") {
+        navigator.vibrate(120);
+      } else {
+        navigator.vibrate([120, 80, 120]);
+      }
+    }
+
+    function feedbackBusca(tipo) {
+      if (tipo === "ok") {
+        codigoBusca.style.border = "2px solid #118a39";
+        codigoBusca.style.background = "#eefbf1";
+        tocarBeep("ok");
+        vibrar("ok");
+      } else if (tipo === "erro") {
+        codigoBusca.style.border = "2px solid #c62828";
+        codigoBusca.style.background = "#fff1f1";
+        tocarBeep("erro");
+        vibrar("erro");
+      } else {
+        codigoBusca.style.border = "1px solid #bdbdbd";
+        codigoBusca.style.background = "#fff";
+      }
     }
 
     function mostrarApp() {
@@ -254,7 +265,8 @@ function feedbackBusca(tipo) {
       eanProduto.textContent = "";
       estoqueProduto.textContent = "";
       localProduto.textContent = "";
-      feedbackBusca("");}
+      feedbackBusca("");
+    }
 
     function preencherProduto(p) {
       produtoAtual = p;
@@ -275,6 +287,22 @@ function feedbackBusca(tipo) {
         imagemProduto.src = "";
       }
     }
+
+    async function tentarBuscar(tipo, codigo) {
+      const url =
+        API_BASE +
+        "/buscar?key=" + encodeURIComponent(API_KEY) +
+        "&tipo=" + encodeURIComponent(tipo) +
+        "&codigo=" + encodeURIComponent(codigo);
+
+      const resp = await fetch(url);
+      const data = await resp.json();
+      return data;
+    }
+
+    toggleSenha.addEventListener("click", () => {
+      senha.type = senha.type === "password" ? "text" : "password";
+    });
 
     btnLogin.addEventListener("click", async () => {
       setStatus(statusLogin, "Entrando...");
@@ -304,51 +332,46 @@ function feedbackBusca(tipo) {
       }
     });
 
+    codigoBusca.addEventListener("input", () => {
+      feedbackBusca("");
+      setStatus(statusApp, "");
+    });
+
     btnBuscar.addEventListener("click", async () => {
-  const codigo = codigoBusca.value.trim();
+      const codigo = codigoBusca.value.trim();
 
-  limparProduto();
+      limparProduto();
 
-  if (codigo.length < 2) {
-    setStatus(statusApp, "Digite pelo menos 2 caracteres.", "erro");
-    feedbackBusca("erro");
-    return;
-  }
+      if (codigo.length < 2) {
+        setStatus(statusApp, "Digite pelo menos 2 caracteres.", "erro");
+        feedbackBusca("erro");
+        return;
+      }
 
-  setStatus(statusApp, "Buscando...");
-  feedbackBusca("");
+      setStatus(statusApp, "Buscando...");
+      feedbackBusca("");
 
-  async function tentarBuscar(tipo) {
-    const url = API_BASE + "/buscar?key=" + encodeURIComponent(API_KEY)
-      + "&tipo=" + encodeURIComponent(tipo)
-      + "&codigo=" + encodeURIComponent(codigo);
+      try {
+        let data = await tentarBuscar("SKU", codigo);
 
-    const resp = await fetch(url);
-    const data = await resp.json();
-    return data;
-  }
+        if (!data.ok || !data.produto) {
+          data = await tentarBuscar("EAN", codigo);
+        }
 
-  try {
-    let data = await tentarBuscar("SKU");
+        if (!data.ok || !data.produto) {
+          setStatus(statusApp, data.erro || "Produto não encontrado.", "erro");
+          feedbackBusca("erro");
+          return;
+        }
 
-    if (!data.ok || !data.produto) {
-      data = await tentarBuscar("EAN");
-    }
-
-    if (!data.ok || !data.produto) {
-      setStatus(statusApp, data.erro || "Produto não encontrado.", "erro");
-      feedbackBusca("erro");
-      return;
-    }
-
-    preencherProduto(data.produto);
-    setStatus(statusApp, "Produto encontrado.", "ok");
-    feedbackBusca("ok");
-  } catch (e) {
-    setStatus(statusApp, "Erro ao buscar: " + e.message, "erro");
-    feedbackBusca("erro");
-  }
-});
+        preencherProduto(data.produto);
+        setStatus(statusApp, "Produto encontrado.", "ok");
+        feedbackBusca("ok");
+      } catch (e) {
+        setStatus(statusApp, "Erro ao buscar: " + e.message, "erro");
+        feedbackBusca("erro");
+      }
+    });
 
     btnSalvar.addEventListener("click", async () => {
       if (!produtoAtual) {
@@ -409,16 +432,6 @@ function feedbackBusca(tipo) {
     } else {
       mostrarLogin();
     }
-
-    const toggleSenha = document.getElementById("toggleSenha");
-
-toggleSenha.addEventListener("click", () => {
-  if (senha.type === "password") {
-    senha.type = "text";
-  } else {
-    senha.type = "password";
-  }
-});
   </script>
 </body>
 </html>
