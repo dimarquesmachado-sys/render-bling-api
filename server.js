@@ -66,12 +66,19 @@ function extractImage(produto) {
     produto?.imagem,
     produto?.linkImagem,
     produto?.urlImagem,
+
+    produto?.imagensExternas?.externas?.[0]?.link,
+    produto?.imagensExternas?.externas?.[0]?.url,
+
     produto?.imagensExternas?.[0]?.link,
     produto?.imagensExternas?.[0]?.url,
+
     produto?.imagens?.[0]?.link,
     produto?.imagens?.[0]?.url,
+
     produto?.midia?.[0]?.link,
     produto?.midia?.[0]?.url,
+
     produto?.anexos?.[0]?.link,
     produto?.anexos?.[0]?.url
   ].filter(Boolean);
