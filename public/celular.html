@@ -500,8 +500,7 @@
       marcarCampoBusca("ok");
       tocarSom("ok");
       mostrarToast("Produto encontrado", "ok");
-      // foco sem teclado: coletor usará o campo de nova localização
-      document.getElementById("novoLocal").focus();
+      // sem foco automático — evita teclado virtual no celular
 
     } catch(e) {
       marcarCampoBusca("erro");
@@ -528,8 +527,7 @@
     if (!novoLocal) {
       tocarSom("erro"); vibrarErro();
       mostrarToast("Digite a nova localização", "erro");
-      // foco sem teclado: coletor usará o campo de nova localização
-      document.getElementById("novoLocal").focus();
+      // sem foco automático — evita teclado virtual no celular
       return;
     }
 
