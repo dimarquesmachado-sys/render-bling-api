@@ -1,565 +1,214 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GOOD x Localização</title>
+<script>
+  const API_KEY = "GIRASSOL_ESTOQUE_2026";
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+  let idProduto = null;
+  let codigoProdutoAtual = null;
+  const DURACAO_LOGIN_MS = 24 * 60 * 60 * 1000;
 
-    body {
-      font-family: Arial, sans-serif;
-      padding: 16px;
-      background: #f5f5f5;
-      margin: 0;
-      color: #111;
-    }
+  function mostrarToast(msg, tipo) {
+    const toast = document.getElementById("toast");
+    toast.innerText = msg;
+    toast.className = tipo === "ok" ? "toast-ok" : "toast-erro";
+    toast.style.display = "block";
 
-    input,
-    button {
-      width: 100%;
-      padding: 14px;
-      margin-top: 10px;
-      font-size: 18px;
-      border-radius: 10px;
-      border: 1px solid #cfcfcf;
-    }
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 2000);
+  }
 
-    button {
-      background: #ffffff;
-      cursor: pointer;
-    }
-
-    .box {
-      background: white;
-      padding: 12px 14px;
-      border-radius: 10px;
-      margin-top: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    }
-
-    #sistema {
-      display: none;
-    }
-
-    #imagem {
-      width: 100%;
-      margin-top: 10px;
-      border-radius: 10px;
-      display: none;
-      background: #fff;
-      max-height: 250px;
-      object-fit: contain;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-    }
-
-    #toast {
-      position: fixed;
-      top: 15px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 14px 20px;
-      border-radius: 10px;
-      color: white;
-      font-size: 16px;
-      z-index: 9999;
-      display: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      max-width: 92vw;
-      text-align: center;
-    }
-
-    .toast-ok {
-      background: #2e7d32;
-    }
-
-    .toast-erro {
-      background: #c62828;
-    }
-
-    .topo {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      gap: 10px;
-    }
-
-    #tituloPagina {
-      margin: 0;
-      font-size: 28px;
-      line-height: 1.1;
-    }
-
-    #btnSairTopo {
-      display: none;
-      width: auto;
-      padding: 8px 14px;
-      margin-top: 0;
-      font-size: 14px;
-      background: #eee;
-      color: #000;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      flex-shrink: 0;
-    }
-
-    .linha-checkbox {
-      display: block;
-      margin-top: 8px;
-      font-size: 16px;
-    }
-
-    .linha-checkbox input {
-      width: auto;
-      margin-right: 8px;
-      transform: scale(1.1);
-    }
-
-    .status-busca-ok {
-      border: 2px solid #2e7d32 !important;
-      background: #edf8ee !important;
-    }
-
-    .status-busca-erro {
-      border: 2px solid #c62828 !important;
-      background: #fff2f2 !important;
-    }
-
-    .campo-senha-wrap {
-      position: relative;
-    }
-
-    .campo-senha-wrap input {
-      padding-right: 56px;
-    }
-
-    .btn-olho {
-      position: absolute;
-      right: 8px;
-      top: 18px;
-      width: 42px;
-      height: 42px;
-      padding: 0;
-      margin: 0;
-      font-size: 18px;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-    }
-
-    .linha-acao {
-      display: flex;
-      align-items: stretch;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .linha-acao input {
-      margin-top: 0;
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-
-    .linha-acao button {
-      margin-top: 0;
-      width: 108px;
-      min-width: 108px;
-      padding: 0 12px;
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .info-produto {
-      font-size: 15px;
-      line-height: 1.2;
-    }
-
-    .info-produto .linha-info {
-      margin: 4px 0;
-      word-break: break-word;
-    }
-
-    .info-produto .linha-info strong {
-      font-weight: 700;
-    }
-
-    @media (max-width: 420px) {
-      body {
-        padding: 12px;
+  function tocarSom(tipo) {
+    if (tipo === "ok") {
+      const som = document.getElementById("somOk");
+      if (som) {
+        som.currentTime = 0;
+        som.play().catch(() => {});
       }
-
-      #tituloPagina {
-        font-size: 24px;
-      }
-
-      input,
-      button {
-        font-size: 16px;
-        padding: 13px;
-      }
-
-      .linha-acao {
-        gap: 6px;
-      }
-
-      .linha-acao button {
-        width: 96px;
-        min-width: 96px;
-        font-size: 15px;
-      }
-
-      .box {
-        padding: 10px 12px;
-      }
-
-      .info-produto {
-        font-size: 14px;
-      }
-
-      #imagem {
-        max-height: 210px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div id="toast"></div>
-
-  <div class="topo">
-    <h2 id="tituloPagina">Login</h2>
-    <button id="btnSairTopo" onclick="sair()">Sair</button>
-  </div>
-
-  <div id="loginBox">
-    <input type="text" id="usuario" placeholder="Usuário" />
-
-    <div class="campo-senha-wrap">
-      <input type="password" id="senha" placeholder="Senha" />
-      <button type="button" class="btn-olho" onclick="toggleSenha()">👁</button>
-    </div>
-
-    <label class="linha-checkbox">
-      <input type="checkbox" id="chkMostrarSenha" onchange="toggleSenhaPorCheckbox()" />
-      Mostrar senha
-    </label>
-
-    <button id="btnEntrar" onclick="login()">Entrar</button>
-  </div>
-
-  <div id="sistema">
-    <div class="linha-acao">
-      <input
-        type="text"
-        id="sku"
-        placeholder="Bipar EAN ou digitar SKU"
-        onkeypress="if(event.key==='Enter'){buscar();}"
-        autofocus
-        autocomplete="off"
-      />
-      <button type="button" onclick="buscar()">Buscar</button>
-    </div>
-
-    <div class="box info-produto">
-      <div class="linha-info"><strong>Produto:</strong> <span id="nome"></span></div>
-      <div class="linha-info"><strong>SKU:</strong> <span id="codigo"></span></div>
-      <div class="linha-info"><strong>EAN:</strong> <span id="ean"></span></div>
-      <div class="linha-info"><strong>Estoque:</strong> <span id="estoque"></span></div>
-      <div class="linha-info"><strong>Local atual:</strong> <span id="local"></span></div>
-    </div>
-
-    <div class="linha-acao">
-      <input
-        type="text"
-        id="novoLocal"
-        placeholder="Nova localização"
-        onkeypress="if(event.key==='Enter'){salvar();}"
-        autocomplete="off"
-      />
-      <button type="button" onclick="salvar()">Salvar</button>
-    </div>
-
-    <img id="imagem" alt="Imagem do produto" />
-  </div>
-
-  <audio id="somOk" preload="auto">
-    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
-  </audio>
-
-  <script>
-    const API_KEY = "GIRASSOL_ESTOQUE_2026";
-
-    let idProduto = null;
-    let codigoProdutoAtual = null;
-    const DURACAO_LOGIN_MS = 24 * 60 * 60 * 1000;
-
-    function mostrarToast(msg, tipo) {
-      const toast = document.getElementById("toast");
-      toast.innerText = msg;
-      toast.className = tipo === "ok" ? "toast-ok" : "toast-erro";
-      toast.style.display = "block";
-
-      setTimeout(() => {
-        toast.style.display = "none";
-      }, 2000);
+      return;
     }
 
-    function tocarSom(tipo) {
-      if (tipo === "ok") {
-        const som = document.getElementById("somOk");
-        if (som) {
-          som.currentTime = 0;
-          som.play().catch(() => {});
-        }
-        return;
-      }
-
-      if (tipo === "erro") {
-        try {
-          const AudioCtx = window.AudioContext || window.webkitAudioContext;
-          const ctx = new AudioCtx();
-
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-
-          osc.type = "sawtooth";
-          osc.frequency.setValueAtTime(260, ctx.currentTime);
-          osc.frequency.linearRampToValueAtTime(120, ctx.currentTime + 0.35);
-
-          gain.gain.setValueAtTime(0.001, ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.03);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
-
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.38);
-        } catch (e) {
-          console.log("Erro ao tocar som de erro:", e);
-        }
-      }
-    }
-
-    function vibrarOk() {
-      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
-    }
-
-    function vibrarErro() {
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    }
-
-    function marcarCampoBusca(tipo) {
-      const campo = document.getElementById("sku");
-      campo.classList.remove("status-busca-ok", "status-busca-erro");
-
-      if (tipo === "ok") {
-        campo.classList.add("status-busca-ok");
-      }
-
-      if (tipo === "erro") {
-        campo.classList.add("status-busca-erro");
-      }
-    }
-
-    function limparPainelProduto() {
-      document.getElementById("nome").innerText = "";
-      document.getElementById("codigo").innerText = "";
-      document.getElementById("ean").innerText = "";
-      document.getElementById("estoque").innerText = "";
-      document.getElementById("local").innerText = "";
-
-      const img = document.getElementById("imagem");
-      img.src = "";
-      img.style.display = "none";
-
-      idProduto = null;
-      codigoProdutoAtual = null;
-    }
-
-    function limparTudoAposSalvar() {
-      document.getElementById("sku").value = "";
-      document.getElementById("novoLocal").value = "";
-      limparPainelProduto();
-      marcarCampoBusca("");
-      document.getElementById("sku").focus();
-    }
-
-    function salvarSessao(usuario) {
-      localStorage.setItem("bling_login", JSON.stringify({
-        usuario,
-        expiraEm: Date.now() + DURACAO_LOGIN_MS
-      }));
-    }
-
-    function obterSessao() {
-      const bruto = localStorage.getItem("bling_login");
-      if (!bruto) return null;
-
+    if (tipo === "erro") {
       try {
-        const sessao = JSON.parse(bruto);
-        if (!sessao.expiraEm || Date.now() > sessao.expiraEm) {
-          localStorage.removeItem("bling_login");
-          return null;
-        }
-        return sessao;
-      } catch {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(260, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(120, ctx.currentTime + 0.35);
+
+        gain.gain.setValueAtTime(0.001, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.38);
+      } catch (e) {
+        console.log("Erro ao tocar som de erro:", e);
+      }
+    }
+  }
+
+  function vibrarOk() {
+    if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+  }
+
+  function vibrarErro() {
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }
+
+  function marcarCampoBusca(tipo) {
+    const campo = document.getElementById("sku");
+    campo.classList.remove("status-busca-ok", "status-busca-erro");
+
+    if (tipo === "ok") {
+      campo.classList.add("status-busca-ok");
+    }
+
+    if (tipo === "erro") {
+      campo.classList.add("status-busca-erro");
+    }
+  }
+
+  function limparPainelProduto() {
+    document.getElementById("nome").innerText = "";
+    document.getElementById("codigo").innerText = "";
+    document.getElementById("ean").innerText = "";
+    document.getElementById("estoque").innerText = "";
+    document.getElementById("local").innerText = "";
+
+    const img = document.getElementById("imagem");
+    img.src = "";
+    img.style.display = "none";
+
+    idProduto = null;
+    codigoProdutoAtual = null;
+  }
+
+  function limparTudoAposSalvar() {
+    document.getElementById("sku").value = "";
+    document.getElementById("novoLocal").value = "";
+    limparPainelProduto();
+    marcarCampoBusca("");
+    document.getElementById("sku").focus();
+  }
+
+  function salvarSessao(usuario) {
+    localStorage.setItem("bling_login", JSON.stringify({
+      usuario,
+      expiraEm: Date.now() + DURACAO_LOGIN_MS
+    }));
+  }
+
+  function obterSessao() {
+    const bruto = localStorage.getItem("bling_login");
+    if (!bruto) return null;
+
+    try {
+      const sessao = JSON.parse(bruto);
+      if (!sessao.expiraEm || Date.now() > sessao.expiraEm) {
         localStorage.removeItem("bling_login");
         return null;
       }
-    }
-
-    function aplicarLoginNaTela() {
-      document.getElementById("sistema").style.display = "block";
-      document.getElementById("loginBox").style.display = "none";
-      document.getElementById("tituloPagina").innerText = "GOOD x Localização";
-      document.getElementById("btnSairTopo").style.display = "inline-block";
-      document.getElementById("sku").focus();
-    }
-
-    function sair() {
+      return sessao;
+    } catch {
       localStorage.removeItem("bling_login");
-      location.reload();
+      return null;
     }
-
-    function definirTipoSenha(visivel) {
-      const campo = document.getElementById("senha");
-      const chk = document.getElementById("chkMostrarSenha");
-      campo.type = visivel ? "text" : "password";
-      chk.checked = visivel;
-    }
-
-    function toggleSenha() {
-      const campo = document.getElementById("senha");
-      definirTipoSenha(campo.type === "password");
-    }
-
-    function toggleSenhaPorCheckbox() {
-      const chk = document.getElementById("chkMostrarSenha");
-      definirTipoSenha(chk.checked);
-    }
-
-    async function login() {
-      try {
-        const usuario = document.getElementById("usuario").value.trim();
-        const senha = document.getElementById("senha").value;
-
-        const r = await fetch("/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuario, senha })
-        });
-
-        const d = await r.json().catch(() => ({}));
-
-        if (r.status === 200) {
-          salvarSessao(usuario);
-          aplicarLoginNaTela();
-          mostrarToast("Login realizado com sucesso", "ok");
-          tocarSom("ok");
-          return;
-        }
-
-        tocarSom("erro");
-        vibrarErro();
-        mostrarToast(d.mensagem || "Usuário ou senha inválidos", "erro");
-      } catch (e) {
-        tocarSom("erro");
-        vibrarErro();
-        mostrarToast("Erro no login: " + e.message, "erro");
-      }
-    }
-
-    function determinarOrdemBusca(codigoDigitado) {
-      const valor = String(codigoDigitado || "").trim();
-      const soNumeros = /^\d+$/.test(valor);
-
-      if (soNumeros && valor.length >= 8) {
-        return ["EAN", "SKU"];
-      }
-
-      return ["SKU", "EAN"];
-    }
-
-    async function consultarProduto(tipo, codigoDigitado) {
-      const url =
-        "/buscar?key=" +
-        encodeURIComponent(API_KEY) +
-        "&tipo=" +
-        encodeURIComponent(tipo) +
-        "&codigo=" +
-        encodeURIComponent(codigoDigitado) +
-        "&_=" +
-        Date.now();
-
-      const r = await fetch(url, { cache: "no-store" });
-      const d = await r.json();
-      return d;
-    }
-
-  function normalizarCodigoBusca(valor) {
-  return String(valor || "")
-    .trim()
-    .replace(/[‐-‒–—−]/g, "-")   // normaliza tipos de hífen
-    .replace(/\s*-\s*/g, "-")    // tira espaços em volta do hífen
-    .replace(/\s+/g, " ");       // compacta espaços internos
-}
-
-function montarVariacoesBusca(valorOriginal) {
-  const base = normalizarCodigoBusca(valorOriginal);
-  const variacoes = [
-    valorOriginal,
-    String(valorOriginal || "").trim(),
-    base,
-    base.toUpperCase()
-  ];
-
-  return [...new Set(variacoes.filter(Boolean))];
-}
-
-async function buscar() {
-  const codigoDigitado = document.getElementById("sku").value.trim();
-
-  if (codigoDigitado.length < 3) {
-    limparPainelProduto();
-    marcarCampoBusca("erro");
-    tocarSom("erro");
-    vibrarErro();
-    mostrarToast("Digite ao menos 3 caracteres", "erro");
-    return;
   }
 
-  limparPainelProduto();
-  marcarCampoBusca("");
+  function aplicarLoginNaTela() {
+    document.getElementById("sistema").style.display = "block";
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("tituloPagina").innerText = "GOOD x Localização";
+    document.getElementById("btnSairTopo").style.display = "inline-block";
+    document.getElementById("sku").focus();
+  }
 
-  try {
-    const variacoes = montarVariacoesBusca(codigoDigitado);
-    let d = null;
-    let encontrado = false;
+  function sair() {
+    localStorage.removeItem("bling_login");
+    location.reload();
+  }
 
-    for (const tentativa of variacoes) {
-      const ordem = determinarOrdemBusca(tentativa);
+  function definirTipoSenha(visivel) {
+    const campo = document.getElementById("senha");
+    const chk = document.getElementById("chkMostrarSenha");
+    campo.type = visivel ? "text" : "password";
+    chk.checked = visivel;
+  }
 
-      for (const tipo of ordem) {
-        d = await consultarProduto(tipo, tentativa);
+  function toggleSenha() {
+    const campo = document.getElementById("senha");
+    definirTipoSenha(campo.type === "password");
+  }
 
-        if (d && d.ok && d.produto) {
-          encontrado = true;
-          break;
-        }
+  function toggleSenhaPorCheckbox() {
+    const chk = document.getElementById("chkMostrarSenha");
+    definirTipoSenha(chk.checked);
+  }
+
+  async function login() {
+    try {
+      const usuario = document.getElementById("usuario").value.trim();
+      const senha = document.getElementById("senha").value;
+
+      const r = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, senha })
+      });
+
+      const d = await r.json().catch(() => ({}));
+
+      if (r.status === 200) {
+        salvarSessao(usuario);
+        aplicarLoginNaTela();
+        mostrarToast("Login realizado com sucesso", "ok");
+        tocarSom("ok");
+        return;
       }
 
-      if (encontrado) break;
+      tocarSom("erro");
+      vibrarErro();
+      mostrarToast(d.mensagem || "Usuário ou senha inválidos", "erro");
+    } catch (e) {
+      tocarSom("erro");
+      vibrarErro();
+      mostrarToast("Erro no login: " + e.message, "erro");
     }
+  }
 
-    if (!d || !d.ok || !d.produto) {
+  async function buscar() {
+    const codigoDigitado = document.getElementById("sku").value.trim();
+
+    if (codigoDigitado.length < 2) {
       marcarCampoBusca("erro");
       tocarSom("erro");
       vibrarErro();
-      mostrarToast((d && d.erro) || "Produto não encontrado", "erro");
+      mostrarToast("Digite ao menos 2 caracteres", "erro");
+      return;
+    }
+
+    limparPainelProduto();
+    marcarCampoBusca("");
+
+    let r = await fetch("/buscar?key=" + encodeURIComponent(API_KEY) + "&tipo=SKU&codigo=" + encodeURIComponent(codigoDigitado));
+    let d = await r.json();
+
+    if (!d.ok || !d.produto) {
+      r = await fetch("/buscar?key=" + encodeURIComponent(API_KEY) + "&tipo=EAN&codigo=" + encodeURIComponent(codigoDigitado));
+      d = await r.json();
+    }
+
+    if (!d.ok || !d.produto) {
+      marcarCampoBusca("erro");
+      tocarSom("erro");
+      vibrarErro();
+      mostrarToast(d.erro || "Produto não encontrado", "erro");
       return;
     }
 
@@ -584,22 +233,58 @@ async function buscar() {
     idProduto = d.produto.id || null;
     codigoProdutoAtual = d.produto.codigo || null;
     document.getElementById("novoLocal").focus();
-  } catch (e) {
-    marcarCampoBusca("erro");
-    tocarSom("erro");
-    vibrarErro();
-    mostrarToast("Erro ao buscar produto: " + e.message, "erro");
   }
-}
 
-    document.getElementById("sku").addEventListener("input", () => {
-      marcarCampoBusca("");
+  async function salvar() {
+    const sku = codigoProdutoAtual || document.getElementById("sku").value.trim();
+    const novoLocal = document.getElementById("novoLocal").value.trim();
+
+    if (!sku || sku.length < 2) {
+      tocarSom("erro");
+      vibrarErro();
+      mostrarToast("Busque um produto antes de salvar", "erro");
+      return;
+    }
+
+    if (!novoLocal) {
+      tocarSom("erro");
+      vibrarErro();
+      mostrarToast("Digite a nova localização", "erro");
+      document.getElementById("novoLocal").focus();
+      return;
+    }
+
+    const r = await fetch("/salvar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        key: API_KEY,
+        codigo: sku,
+        novaLocalizacao: novoLocal
+      })
     });
 
-    const sessaoExistente = obterSessao();
-    if (sessaoExistente) {
-      aplicarLoginNaTela();
+    const d = await r.json();
+
+    if (!d.ok) {
+      tocarSom("erro");
+      vibrarErro();
+      mostrarToast(d.erro || "Erro ao salvar", "erro");
+      return;
     }
-  </script>
-</body>
-</html>
+
+    tocarSom("ok");
+    vibrarOk();
+    mostrarToast("Salvo com sucesso", "ok");
+    limparTudoAposSalvar();
+  }
+
+  document.getElementById("sku").addEventListener("input", () => {
+    marcarCampoBusca("");
+  });
+
+  const sessaoExistente = obterSessao();
+  if (sessaoExistente) {
+    aplicarLoginNaTela();
+  }
+</script>
