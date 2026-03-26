@@ -237,7 +237,6 @@
         onkeypress="if(event.key==='Enter'){buscar();}"
       />
       <button class="btn btn-primario" id="btnBuscar" onclick="buscar()">Buscar</button>
-      <button class="btn" id="btnCancelar" onclick="cancelarBusca()" style="display:none;background:#b71c1c;color:#fff;width:auto;padding:0 16px;">✕</button>
     </div>
 
     <div class="card">
@@ -290,7 +289,6 @@
 <script>
   const API_KEY = "GIRASSOL_ESTOQUE_2026";
   let codigoProdutoAtual = null;
-  let buscaController = null;
   const DURACAO_LOGIN_MS = 24 * 60 * 60 * 1000;
 
   // ===== TOAST =====
@@ -383,7 +381,7 @@
     document.getElementById("tituloPagina").innerText = "GOOD x Localização";
     document.getElementById("logoTopo").style.display = "block";
     document.getElementById("btnSairTopo").style.display = "inline-block";
-    // não abre teclado
+    document.getElementById("sku").focus();
   }
 
   function sair() {
@@ -443,40 +441,10 @@
     }
   }
 
-  // ===== CANCELAR BUSCA =====
-  function cancelarBusca() {
-    if (buscaController) {
-      buscaController.abort();
-      buscaController = null;
-    }
-    const btn = document.getElementById("btnBuscar");
-    const btnC = document.getElementById("btnCancelar");
-    const campoBusca = document.getElementById("sku");
-
-    // Bloqueia tudo por 1.2s até a requisição morrer de verdade
-    btnC.style.display = "none";
-    btn.disabled = true;
-    btn.innerText = "Cancelando...";
-    campoBusca.setAttribute("readonly", true);
-    campoBusca.style.opacity = "0.5";
-    marcarCampoBusca("");
-    mostrarToast("Busca cancelada", "erro");
-
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.innerText = "Buscar";
-      campoBusca.removeAttribute("readonly");
-      campoBusca.style.opacity = "1";
-      campoBusca.value = "";
-      campoBusca.focus();
-    }, 1200);
-  }
-
   // ===== BUSCAR =====
   async function buscar() {
     const codigoDigitado = (document.getElementById("sku").value || "").trim();
     const btn = document.getElementById("btnBuscar");
-    const btnC = document.getElementById("btnCancelar");
 
     if (codigoDigitado.length < 2) {
       marcarCampoBusca("erro");
@@ -485,23 +453,16 @@
       return;
     }
 
-    // Cancela busca anterior se ainda estiver rodando
-    if (buscaController) buscaController.abort();
-    buscaController = new AbortController();
-    const signal = buscaController.signal;
-
     limparPainelProduto();
     marcarCampoBusca("");
     btn.disabled = true;
     btn.innerText = "Buscando...";
-    btnC.style.display = "block";
 
     try {
       // Tenta SKU primeiro
       let r = await fetch(
         "/buscar?key=" + encodeURIComponent(API_KEY) +
-        "&tipo=SKU&codigo=" + encodeURIComponent(codigoDigitado),
-        { signal }
+        "&tipo=SKU&codigo=" + encodeURIComponent(codigoDigitado)
       );
       let d = await r.json().catch(() => ({ ok: false }));
 
@@ -509,8 +470,7 @@
       if (!d.ok || !d.produto) {
         r = await fetch(
           "/buscar?key=" + encodeURIComponent(API_KEY) +
-          "&tipo=EAN&codigo=" + encodeURIComponent(codigoDigitado),
-          { signal }
+          "&tipo=EAN&codigo=" + encodeURIComponent(codigoDigitado)
         );
         d = await r.json().catch(() => ({ ok: false }));
       }
@@ -549,18 +509,12 @@
       novoLocalEl.focus();
 
     } catch(e) {
-      if (e.name === "AbortError") {
-        // Cancelado pelo usuário — não mostra erro
-        return;
-      }
       marcarCampoBusca("erro");
       tocarSom("erro"); vibrarErro();
       mostrarToast("Erro ao buscar: " + e.message, "erro");
     } finally {
-      buscaController = null;
       btn.disabled = false;
       btn.innerText = "Buscar";
-      btnC.style.display = "none";
     }
   }
 
