@@ -383,7 +383,7 @@
     document.getElementById("tituloPagina").innerText = "GOOD x Localização";
     document.getElementById("logoTopo").style.display = "block";
     document.getElementById("btnSairTopo").style.display = "inline-block";
-    document.getElementById("sku").focus();
+    // não abre teclado
   }
 
   function sair() {
@@ -548,10 +548,6 @@
       novoLocalEl.setAttribute("readonly", true);
       novoLocalEl.focus();
 
-    } catch(e) {
-      marcarCampoBusca("erro");
-      tocarSom("erro"); vibrarErro();
-      mostrarToast("Erro ao buscar: " + e.message, "erro");
     } catch(e) {
       if (e.name === "AbortError") {
         // Cancelado pelo usuário — não mostra erro
