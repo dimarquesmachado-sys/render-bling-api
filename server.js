@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
 
 // ================= RENDER API =================
-const RENDER_API_KEY = "rnd_1NUSsu0O0VLBaf0sEFgo8gE4epHT";
+const RENDER_API_KEY = "rnd_CGG5iTYnW9iIoyOPPTMCebqrk2i1";
 const RENDER_SERVICE_ID = "srv-d71m8ot5pdvs7381m9l0";
 
 async function atualizarVariavelRender(chave, valor) {
