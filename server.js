@@ -337,29 +337,29 @@ async function resolverProduto(tipo, valor) {
     const lista = tentativa.data?.data || [];
     if (!lista.length) continue;
 
-        iif (tipoBusca === "SKU") {
-  const candidatos = lista
-    .filter((item) => item?.id && !idsJaTentados.has(item.id))
-    .slice(0, 20);
+    if (tipoBusca === "SKU") {
+      const candidatos = lista
+        .filter((item) => item?.id && !idsJaTentados.has(item.id))
+        .slice(0, 20);
 
-  for (const item of candidatos) {
-    idsJaTentados.add(item.id);
+      for (const item of candidatos) {
+        idsJaTentados.add(item.id);
 
-    const detalhe = await buscarDetalheProduto(item.id, accessTokenAtual);
-    if (!detalhe?.produto) continue;
+        const detalhe = await buscarDetalheProduto(item.id, accessTokenAtual);
+        if (!detalhe?.produto) continue;
 
-    accessTokenAtual = detalhe.accessToken;
-    const p = detalhe.produto;
+        accessTokenAtual = detalhe.accessToken;
+        const p = detalhe.produto;
 
-    if (matchSkuExato(p, valorOriginal)) {
-      return {
-        ok: true,
-        produto: p,
-        accessToken: accessTokenAtual
-      };
-    }
-  }
-} else {
+        if (matchSkuExato(p, valorOriginal)) {
+          return {
+            ok: true,
+            produto: p,
+            accessToken: accessTokenAtual
+          };
+        }
+      }
+    } else {
       const candidatos = lista
         .filter((item) => item?.id && !idsJaTentados.has(item.id))
         .slice(0, 15);
