@@ -168,8 +168,10 @@
       text-align: center; margin-bottom: 10px;
       flex: 1;
       min-height: 0;
+      max-height: 28vh;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
     #imagem {
       max-width: 100%;
@@ -271,6 +273,7 @@
         type="text" id="novoLocal"
         placeholder="Nova localização"
         autocomplete="off"
+        readonly
         onkeypress="if(event.key==='Enter'){salvar();}"
       />
       <button class="btn btn-primario" id="btnSalvar" onclick="salvar()">Salvar</button>
@@ -500,7 +503,10 @@
       marcarCampoBusca("ok");
       tocarSom("ok");
       mostrarToast("Produto encontrado", "ok");
-      // sem foco automático — evita teclado virtual no celular
+      // foco com readOnly: coletor funciona, teclado virtual não abre
+      const novoLocalEl = document.getElementById("novoLocal");
+      novoLocalEl.setAttribute("readonly", true);
+      novoLocalEl.focus();
 
     } catch(e) {
       marcarCampoBusca("erro");
@@ -527,7 +533,10 @@
     if (!novoLocal) {
       tocarSom("erro"); vibrarErro();
       mostrarToast("Digite a nova localização", "erro");
-      // sem foco automático — evita teclado virtual no celular
+      // foco com readOnly: coletor funciona, teclado virtual não abre
+      const novoLocalEl = document.getElementById("novoLocal");
+      novoLocalEl.setAttribute("readonly", true);
+      novoLocalEl.focus();
       return;
     }
 
@@ -563,6 +572,16 @@
 
   // ===== EVENTOS =====
   document.getElementById("sku").addEventListener("input", () => marcarCampoBusca(""));
+
+  // readOnly no novoLocal: remove ao toque (abre teclado) mas mantém para coletor
+  document.getElementById("novoLocal").addEventListener("touchstart", function() {
+    this.removeAttribute("readonly");
+    this.focus();
+  });
+  document.getElementById("novoLocal").addEventListener("blur", function() {
+    // restaura readOnly quando sai do campo, para próxima bipagem funcionar
+    this.setAttribute("readonly", true);
+  });
 
   document.getElementById("usuario").addEventListener("keypress", (e) => {
     if (e.key === "Enter") document.getElementById("senha").focus();
