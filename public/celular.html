@@ -348,7 +348,7 @@
     document.getElementById("novoLocal").value = "";
     limparPainelProduto();
     marcarCampoBusca("");
-    document.getElementById("sku").focus();
+    // não abre teclado após salvar
   }
 
   // ===== SESSÃO =====
@@ -500,6 +500,7 @@
       marcarCampoBusca("ok");
       tocarSom("ok");
       mostrarToast("Produto encontrado", "ok");
+      // foco sem teclado: coletor usará o campo de nova localização
       document.getElementById("novoLocal").focus();
 
     } catch(e) {
@@ -527,6 +528,7 @@
     if (!novoLocal) {
       tocarSom("erro"); vibrarErro();
       mostrarToast("Digite a nova localização", "erro");
+      // foco sem teclado: coletor usará o campo de nova localização
       document.getElementById("novoLocal").focus();
       return;
     }
