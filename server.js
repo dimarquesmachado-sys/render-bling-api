@@ -394,8 +394,23 @@ async function resolverProduto(tipo, valor) {
       return { ok: true, produto };
     }
 
-    // Cache carregado e não achou — produto não existe, retorna na hora
-    console.log(`[CACHE-MISS] ${tipoBusca} ${valorOriginal} — não encontrado no cache.`);
+    // Cache-miss — tenta busca profunda no cache varrendo todos os campos
+    console.log(`[CACHE-MISS] ${tipoBusca} ${valorOriginal} — buscando em todos os campos do cache...`);
+    
+    if (tipoBusca === "EAN") {
+      const eanDigits = onlyDigits(valorOriginal);
+      for (const [id, p] of cache.produtos) {
+        const eansDoP = getPossiveisEans(p);
+        if (eansDoP.some(e => isExactDigits(e, valorOriginal))) {
+          // Achou! Indexa para próximas buscas
+          cache.porEan.set(eanDigits, id);
+          console.log(`[CACHE-DEEP] EAN ${valorOriginal} encontrado em ${p.codigo}`);
+          return { ok: true, produto: p };
+        }
+      }
+    }
+
+    console.log(`[CACHE-MISS] ${tipoBusca} ${valorOriginal} — não encontrado.`);
     return { ok: false, erro: "Produto não encontrado" };
   }
 
