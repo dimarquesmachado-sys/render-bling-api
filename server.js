@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 10000;
 const API_KEY = process.env.API_KEY;
 
 // ================= RENDER API =================
-const RENDER_API_KEY = "rnd_CGG5iTYnW9iIoyOPPTMCebqrk2i1";
+const RENDER_API_KEY = "rnd_1NUSsu0O0VLBaf0sEFgo8gE4epHT";
 const RENDER_SERVICE_ID = "srv-d71m8ot5pdvs7381m9l0";
 
 async function atualizarVariavelRender(chave, valor) {
@@ -271,18 +271,31 @@ async function blingRequest(url, options = {}, accessToken = process.env.BLING_A
 }
 
 // ================= BLING HELPERS =================
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 async function listarProdutosPorUrl(url, accessTokenAtual) {
   return await blingRequest(url, {}, accessTokenAtual);
 }
 
 async function buscarDetalheProduto(id, accessTokenAtual) {
-  const detalhe = await blingRequest(
-    `https://api.bling.com.br/Api/v3/produtos/${id}`,
-    {},
-    accessTokenAtual
-  );
-  if (!detalhe.response.ok) return null;
-  return { produto: detalhe.data?.data || null, accessToken: detalhe.accessToken };
+  let tentativas = 0;
+  while (tentativas < 3) {
+    const detalhe = await blingRequest(
+      `https://api.bling.com.br/Api/v3/produtos/${id}`,
+      {},
+      accessTokenAtual
+    );
+    // Rate limit — espera e tenta de novo
+    if (detalhe.response.status === 429) {
+      tentativas++;
+      console.warn(`[BLING] Rate limit 429 no produto ${id}. Tentativa ${tentativas}/3. Aguardando 1.5s...`);
+      await sleep(1500);
+      continue;
+    }
+    if (!detalhe.response.ok) return null;
+    return { produto: detalhe.data?.data || null, accessToken: detalhe.accessToken };
+  }
+  console.warn(`[BLING] Produto ${id} ignorado após 3 tentativas com 429.`);
+  return null;
 }
 
 function matchSkuExato(produto, valorDigitado) {
@@ -339,6 +352,7 @@ async function resolverProduto(tipo, valor) {
       const candidatos = lista.filter((item) => item?.id && !idsJaTentados.has(item.id)).slice(0, 15);
       for (const item of candidatos) {
         idsJaTentados.add(item.id);
+        await sleep(300); // evita rate limit
         const detalhe = await buscarDetalheProduto(item.id, accessTokenAtual);
         if (!detalhe?.produto) continue;
         accessTokenAtual = detalhe.accessToken;
