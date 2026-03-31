@@ -233,8 +233,11 @@ async function carregarTodosOsProdutos() {
       }
 
       const lista = data?.data || [];
-      const totalApi = data?.total || data?.meta?.total || "?";
-      if (pagina === 1) console.log(`[CACHE] API informa total de produtos: ${totalApi}`);
+      if (pagina === 1) {
+        console.log(`[CACHE] Chaves da resposta: ${Object.keys(data || {}).join(", ")}`);
+        console.log(`[CACHE] Itens na página 1: ${lista.length}`);
+        console.log(`[CACHE] Estrutura meta: ${JSON.stringify(data?.meta || data?.paging || data?.pagination || {})}`);
+      }
       if (!lista.length) break;
 
       // Busca detalhes de cada produto em paralelo (lotes de 5)
